@@ -33,6 +33,9 @@ function rgba(hex) {
 
 class PixelCanvas {
   constructor(width, height) {
+    if (![width, height].every(Number.isInteger) || width <= 0 || height <= 0) {
+      throw new Error("Pixel canvas must use positive integer dimensions");
+    }
     this.width = width;
     this.height = height;
     this.data = Buffer.alloc(width * height * 4);
@@ -86,6 +89,28 @@ class PixelCanvas {
     return region;
   }
 
+  blitNearestNeighbor(source, targetX, targetY, pixelScale) {
+    if (!(source instanceof PixelCanvas)) throw new Error("Scaled pixel source must be a PixelCanvas");
+    if (![targetX, targetY].every(Number.isInteger)) throw new Error("Scaled pixel target must use integer coordinates");
+    if (!Number.isInteger(pixelScale) || pixelScale <= 0) throw new Error("Pixel scale must be a positive integer");
+    const scaledWidth = source.width * pixelScale;
+    const scaledHeight = source.height * pixelScale;
+    if (targetX < 0 || targetY < 0 || targetX + scaledWidth > this.width || targetY + scaledHeight > this.height) {
+      throw new Error("Scaled pixel source exceeds canvas bounds");
+    }
+    for (let sourceY = 0; sourceY < source.height; sourceY += 1) {
+      for (let sourceX = 0; sourceX < source.width; sourceX += 1) {
+        const sourceIndex = (sourceY * source.width + sourceX) * 4;
+        for (let blockY = 0; blockY < pixelScale; blockY += 1) {
+          for (let blockX = 0; blockX < pixelScale; blockX += 1) {
+            const targetIndex = ((targetY + sourceY * pixelScale + blockY) * this.width + targetX + sourceX * pixelScale + blockX) * 4;
+            source.data.copy(this.data, targetIndex, sourceIndex, sourceIndex + 4);
+          }
+        }
+      }
+    }
+  }
+
   encodePng() {
     const header = Buffer.alloc(13);
     header.writeUInt32BE(this.width, 0);
@@ -109,6 +134,19 @@ class PixelCanvas {
 
 function sha256(buffer) { return crypto.createHash("sha256").update(buffer).digest("hex"); }
 
+function logicalDimensions(width, height, pixelScale, label = "Sprite") {
+  if (![width, height].every(Number.isInteger) || width <= 0 || height <= 0) {
+    throw new Error(`${label} must use positive integer physical dimensions`);
+  }
+  if (!Number.isInteger(pixelScale) || pixelScale <= 0) {
+    throw new Error(`${label} pixelScale must be a positive integer`);
+  }
+  if (width % pixelScale !== 0 || height % pixelScale !== 0) {
+    throw new Error(`${label} dimensions ${width}x${height} must be divisible by pixelScale ${pixelScale}`);
+  }
+  return { width: width / pixelScale, height: height / pixelScale };
+}
+
 function readPngInfo(buffer) {
   const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
   if (buffer.length < 33 || !buffer.subarray(0, 8).equals(signature)) throw new Error("Invalid PNG signature");
@@ -121,4 +159,70 @@ function readPngInfo(buffer) {
   };
 }
 
-module.exports = { PixelCanvas, readPngInfo, rgba, sha256 };
+function paethPredictor(left, above, upperLeft) {
+  const estimate = left + above - upperLeft;
+  const leftDistance = Math.abs(estimate - left);
+  const aboveDistance = Math.abs(estimate - above);
+  const upperLeftDistance = Math.abs(estimate - upperLeft);
+  if (leftDistance <= aboveDistance && leftDistance <= upperLeftDistance) return left;
+  if (aboveDistance <= upperLeftDistance) return above;
+  return upperLeft;
+}
+
+function decodePngRgba(buffer) {
+  const info = readPngInfo(buffer);
+  if (info.bitDepth !== 8 || info.colorType !== 6) throw new Error("PNG must be 8-bit RGBA");
+  if (buffer[26] !== 0 || buffer[27] !== 0 || buffer[28] !== 0) {
+    throw new Error("PNG must use standard compression, filtering, and no interlacing");
+  }
+
+  const idat = [];
+  let offset = 8;
+  let foundEnd = false;
+  while (offset < buffer.length) {
+    if (offset + 12 > buffer.length) throw new Error("Truncated PNG chunk");
+    const length = buffer.readUInt32BE(offset);
+    const dataStart = offset + 8;
+    const dataEnd = dataStart + length;
+    const chunkEnd = dataEnd + 4;
+    if (chunkEnd > buffer.length) throw new Error("Truncated PNG chunk data");
+    const type = buffer.subarray(offset + 4, offset + 8).toString("ascii");
+    const expectedCrc = buffer.readUInt32BE(dataEnd);
+    const actualCrc = crc32(buffer.subarray(offset + 4, dataEnd));
+    if (actualCrc !== expectedCrc) throw new Error(`Invalid PNG ${type} checksum`);
+    if (type === "IDAT") idat.push(buffer.subarray(dataStart, dataEnd));
+    if (type === "IEND") {
+      foundEnd = true;
+      break;
+    }
+    offset = chunkEnd;
+  }
+  if (idat.length === 0 || !foundEnd) throw new Error("PNG is missing image data or end marker");
+
+  const rowBytes = info.width * 4;
+  const encoded = zlib.inflateSync(Buffer.concat(idat));
+  const expectedLength = (rowBytes + 1) * info.height;
+  if (encoded.length !== expectedLength) throw new Error("Unexpected PNG image-data length");
+  const data = Buffer.alloc(rowBytes * info.height);
+  for (let row = 0; row < info.height; row += 1) {
+    const encodedRow = row * (rowBytes + 1);
+    const filter = encoded[encodedRow];
+    if (filter > 4) throw new Error(`Unsupported PNG row filter: ${filter}`);
+    for (let column = 0; column < rowBytes; column += 1) {
+      const target = row * rowBytes + column;
+      const raw = encoded[encodedRow + 1 + column];
+      const left = column >= 4 ? data[target - 4] : 0;
+      const above = row > 0 ? data[target - rowBytes] : 0;
+      const upperLeft = row > 0 && column >= 4 ? data[target - rowBytes - 4] : 0;
+      let predictor = 0;
+      if (filter === 1) predictor = left;
+      else if (filter === 2) predictor = above;
+      else if (filter === 3) predictor = Math.floor((left + above) / 2);
+      else if (filter === 4) predictor = paethPredictor(left, above, upperLeft);
+      data[target] = (raw + predictor) & 0xff;
+    }
+  }
+  return { ...info, data };
+}
+
+module.exports = { PixelCanvas, decodePngRgba, logicalDimensions, readPngInfo, rgba, sha256 };

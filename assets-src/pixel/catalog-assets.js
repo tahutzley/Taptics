@@ -5,367 +5,351 @@ const p = require("./palette.js");
 
 const EXPECTED_COUNTS = Object.freeze({ cards: 29, weapons: 2, structures: 6 });
 
-function stableText(value) {
-  if (value === null || value === undefined) return "";
-  if (Array.isArray(value)) return `[${value.map(stableText).join(",")}]`;
-  if (typeof value === "object") {
-    return `{${Object.keys(value).sort().map((key) => `${key}:${stableText(value[key])}`).join(",")}}`;
-  }
-  return String(value);
-}
-
-function hashText(value) {
-  let hash = 0x811c9dc5;
-  for (const character of String(value)) {
-    hash ^= character.charCodeAt(0);
-    hash = Math.imul(hash, 0x01000193);
-  }
-  hash ^= hash >>> 16;
-  hash = Math.imul(hash, 0x7feb352d);
-  hash ^= hash >>> 15;
-  hash = Math.imul(hash, 0x846ca68b);
-  return (hash ^ (hash >>> 16)) >>> 0;
-}
-
-function artHint(entry) {
-  return stableText(entry.art || (entry.presentation && entry.presentation.art) || entry.portrait || "").toLowerCase();
-}
-
-function seedFor(kind, key, entry, index) {
-  return hashText([kind, key, entry.category, entry.type, artHint(entry), index].join("|"));
-}
-
 function themeFor(category) {
-  if (category === "attack") return { accent: p.attack, dark: p.oxblood, light: p.gold };
-  if (category === "magic") return { accent: p.magic, dark: p.ironDark, light: p.shield };
-  return { accent: p.crew, dark: p.oakDark, light: p.parchmentAged };
+  if (category === "attack") return { accent: p.attack, light: p.gold };
+  if (category === "magic") return { accent: p.magic, light: p.shield };
+  return { accent: p.crew, light: p.parchmentAged };
 }
 
-function drawSignature(canvas, x, y, index, bits, light, dark) {
-  const value = index + 1;
-  for (let bit = 0; bit < bits; bit += 1) {
-    canvas.rect(x + bit * 6, y, 4, 2, value & (1 << bit) ? light : dark);
-  }
+function drawPortraitFrame(canvas, theme) {
+  canvas.rect(0, 0, 16, 16, p.shadow);
+  canvas.rect(1, 1, 14, 14, theme.accent);
+  canvas.rect(2, 2, 12, 12, p.charred);
+  canvas.rect(5, 14, 6, 1, theme.light);
 }
 
-function drawPortraitFrame(canvas, x, y, theme, seed, index) {
-  canvas.rect(x, y, 48, 48, p.shadow);
-  canvas.rect(x + 1, y + 1, 46, 46, p.ironDark);
-  canvas.rect(x + 3, y + 3, 42, 42, theme.accent);
-  canvas.rect(x + 5, y + 5, 38, 38, p.charred);
-  canvas.rect(x + 7, y + 7, 34, 32, theme.dark);
-  canvas.rect(x + 8, y + 8, 32, 30, p.stoneDark);
-  for (let row = 0; row < 3; row += 1) {
-    const left = 9 + ((seed >>> (row * 3)) & 3);
-    canvas.rect(x + left, y + 10 + row * 9, 4 + ((seed >>> (row * 4 + 5)) & 3), 2, row % 2 ? p.stone : theme.dark);
-  }
-  canvas.pixel(x + 4, y + 4, theme.light);
-  canvas.pixel(x + 43, y + 4, theme.light);
-  canvas.pixel(x + 4, y + 43, theme.light);
-  canvas.pixel(x + 43, y + 43, theme.light);
-  drawSignature(canvas, x + 9, y + 41, index, 5, theme.light, theme.dark);
-}
-
-function attackVariant(hint, seed) {
-  if (/drum|mallet/.test(hint)) return 0;
-  if (/helm|oath|frenzy/.test(hint)) return 1;
-  if (/bolt|arrow|volley/.test(hint)) return 2;
-  if (/trebuchet|stone|siege|barrage/.test(hint)) return 3;
-  if (/writ|sword|seal|order/.test(hint)) return 4;
-  return seed % 5;
-}
-
-function drawAttackMotif(canvas, x, y, variant, seed, theme) {
-  if (variant === 0) {
-    for (const left of [10, 26]) {
-      canvas.rect(x + left, y + 21, 12, 11, p.shadow);
-      canvas.rect(x + left + 2, y + 22, 8, 8, p.oxblood);
-      canvas.rect(x + left + 3, y + 24, 6, 2, p.gold);
+// Every exact GAME_DATA art token owns one bold glyph. These deliberately avoid
+// seeded texture and footer signatures: the item silhouette carries identity.
+const CARD_MOTIFS = Object.freeze({
+  "forked-lightning"(canvas) {
+    canvas.line(10, 3, 6, 8, p.parchment);
+    canvas.line(6, 8, 9, 8, p.shield);
+    canvas.line(9, 8, 5, 13, p.parchment);
+    canvas.line(7, 6, 4, 5, p.magic);
+    canvas.line(8, 10, 12, 11, p.magic);
+  },
+  "helm-blood-rune"(canvas) {
+    canvas.rect(5, 5, 6, 6, p.ironDark);
+    canvas.rect(6, 4, 4, 2, p.ironLight);
+    canvas.pixel(4, 5, p.goldDark);
+    canvas.pixel(11, 5, p.goldDark);
+    canvas.rect(6, 8, 2, 2, p.oxblood);
+    canvas.rect(9, 8, 2, 2, p.oxblood);
+    canvas.line(8, 3, 8, 7, p.oxblood);
+    canvas.pixel(8, 11, p.oxblood);
+  },
+  "shield-stone"(canvas) {
+    canvas.rect(5, 4, 6, 2, p.stoneLight);
+    canvas.rect(4, 6, 8, 5, p.ironDark);
+    canvas.rect(5, 7, 6, 4, p.stone);
+    canvas.rect(6, 11, 4, 2, p.stoneDark);
+    canvas.rect(3, 11, 3, 2, p.stoneLight);
+    canvas.rect(10, 11, 3, 2, p.stoneLight);
+    canvas.line(8, 6, 8, 11, p.shield);
+  },
+  "mirror-runestones"(canvas) {
+    for (const left of [4, 10]) {
+      canvas.rect(left, 4, 3, 8, p.ironDark);
+      canvas.rect(left + 1, 5, 1, 6, p.magic);
     }
-    canvas.line(x + 12, y + 12, x + 29, y + 25, p.parchment);
-    canvas.line(x + 35, y + 12, x + 19, y + 25, p.parchmentAged);
-  } else if (variant === 1) {
-    canvas.rect(x + 15, y + 15, 18, 15, p.ironDark);
-    canvas.rect(x + 18, y + 12, 12, 5, p.ironLight);
-    canvas.rect(x + 13, y + 18, 4, 8, p.goldDark);
-    canvas.rect(x + 31, y + 18, 4, 8, p.goldDark);
-    canvas.rect(x + 19, y + 23, 4, 3, p.oxblood);
-    canvas.rect(x + 26, y + 23, 4, 3, p.oxblood);
-    canvas.line(x + 24, y + 9, x + 24, y + 17, theme.light);
-  } else if (variant === 2) {
-    canvas.rect(x + 15, y + 14, 18, 20, p.ironDark);
-    canvas.rect(x + 18, y + 16, 12, 15, p.iron);
-    canvas.line(x + 8, y + 29, x + 38, y + 14, p.parchment);
-    canvas.line(x + 9, y + 30, x + 39, y + 15, p.gold);
-    canvas.line(x + 35, y + 13, x + 41, y + 14, p.parchmentAged);
-    canvas.line(x + 36, y + 13, x + 38, y + 19, p.parchmentAged);
-  } else if (variant === 3) {
-    canvas.rect(x + 10, y + 31, 27, 3, p.oakDark);
-    canvas.line(x + 16, y + 31, x + 30, y + 13, p.oakLight);
-    canvas.line(x + 30, y + 13, x + 38, y + 26, p.parchmentAged);
-    canvas.rect(x + 11, y + 27, 7, 7, p.ironDark);
-    for (let stone = 0; stone < 3; stone += 1) canvas.rect(x + 31 + stone * 3, y + 8 + ((seed >>> stone) & 3), 3, 3, p.stoneLight);
-  } else {
-    canvas.rect(x + 12, y + 12, 19, 23, p.parchmentAged);
-    canvas.rect(x + 15, y + 15, 13, 2, p.oxblood);
-    canvas.rect(x + 16, y + 20, 11, 1, p.oak);
-    canvas.rect(x + 16, y + 24, 8, 1, p.oak);
-    canvas.line(x + 32, y + 9, x + 18, y + 35, p.ironLight);
-    canvas.rect(x + 29, y + 9, 7, 4, p.gold);
-    canvas.rect(x + 16, y + 33, 8, 4, p.oxblood);
+    canvas.line(7, 6, 9, 8, p.shield);
+    canvas.line(9, 8, 7, 10, p.shield);
+    canvas.pixel(5, 7, p.parchmentAged);
+    canvas.pixel(11, 9, p.parchmentAged);
+  },
+  "chest-bandage"(canvas) {
+    canvas.rect(3, 6, 10, 7, p.oakDark);
+    canvas.rect(4, 7, 8, 5, p.oak);
+    canvas.rect(6, 5, 4, 2, p.goldDark);
+    canvas.rect(7, 7, 2, 5, p.parchmentAged);
+    canvas.rect(5, 9, 6, 2, p.parchmentAged);
+  },
+  "writ-sword"(canvas) {
+    canvas.rect(3, 3, 7, 10, p.parchmentAged);
+    canvas.rect(4, 5, 4, 1, p.oxblood);
+    canvas.rect(4, 8, 3, 1, p.oak);
+    canvas.line(12, 3, 7, 13, p.ironLight);
+    canvas.rect(10, 3, 4, 2, p.gold);
+    canvas.rect(3, 11, 4, 2, p.oxblood);
+  },
+  "alembic-furnace"(canvas) {
+    canvas.rect(3, 9, 10, 4, p.oakDark);
+    canvas.rect(4, 10, 8, 2, p.attack);
+    canvas.rect(7, 4, 3, 5, p.parchment);
+    canvas.rect(5, 3, 7, 2, p.shield);
+    canvas.rect(6, 5, 5, 3, p.magic);
+    canvas.pixel(8, 11, p.gold);
+  },
+  "vortex-stone"(canvas) {
+    canvas.line(8, 3, 13, 8, p.shield);
+    canvas.line(13, 8, 8, 13, p.magic);
+    canvas.line(8, 13, 3, 8, p.shield);
+    canvas.line(3, 8, 8, 3, p.magic);
+    canvas.line(8, 5, 11, 8, p.magic);
+    canvas.line(11, 8, 8, 11, p.shield);
+    canvas.rect(7, 7, 2, 2, p.shadow);
+  },
+  "vine-menhir"(canvas) {
+    canvas.rect(6, 3, 5, 10, p.ironDark);
+    canvas.rect(7, 2, 3, 10, p.stone);
+    canvas.line(8, 4, 8, 10, p.magic);
+    canvas.line(4, 12, 8, 8, p.crew);
+    canvas.line(12, 11, 9, 7, p.crew);
+    canvas.pixel(4, 10, p.parchment);
+    canvas.pixel(12, 9, p.parchment);
+  },
+  "broken-bell"(canvas) {
+    canvas.rect(6, 4, 4, 2, p.gold);
+    canvas.rect(4, 6, 8, 5, p.goldDark);
+    canvas.rect(6, 11, 4, 2, p.ironDark);
+    canvas.line(3, 3, 13, 12, p.magic);
+    canvas.line(4, 2, 14, 11, p.shield);
+  },
+  "bloodthorn-spire"(canvas) {
+    canvas.rect(7, 4, 3, 9, p.oxblood);
+    canvas.rect(6, 8, 5, 5, p.magic);
+    canvas.line(7, 5, 3, 9, p.oxblood);
+    canvas.line(10, 6, 13, 10, p.oxblood);
+    canvas.pixel(8, 2, p.parchment);
+    canvas.pixel(3, 8, p.oxblood);
+    canvas.pixel(13, 9, p.oxblood);
+  },
+  "mallet-stone"(canvas) {
+    canvas.line(4, 4, 11, 11, p.oakLight);
+    canvas.rect(3, 3, 5, 3, p.ironLight);
+    canvas.rect(8, 9, 5, 4, p.stone);
+    canvas.rect(9, 10, 4, 1, p.stoneLight);
+  },
+  "crossed-rune"(canvas) {
+    canvas.line(4, 4, 12, 12, p.magic);
+    canvas.line(12, 4, 4, 12, p.shield);
+    canvas.rect(7, 6, 2, 1, p.parchmentAged);
+    canvas.rect(7, 10, 2, 1, p.parchmentAged);
+    canvas.pixel(3, 3, p.parchment);
+    canvas.pixel(13, 3, p.parchment);
+    canvas.pixel(3, 13, p.parchment);
+  },
+  "hide-drums"(canvas) {
+    canvas.rect(3, 8, 4, 4, p.oxblood);
+    canvas.rect(9, 8, 4, 4, p.oxblood);
+    canvas.rect(4, 9, 2, 1, p.gold);
+    canvas.rect(10, 9, 2, 1, p.gold);
+    canvas.line(4, 4, 9, 9, p.parchment);
+    canvas.line(12, 4, 7, 9, p.parchmentAged);
+  },
+  "runed-shield"(canvas) {
+    canvas.rect(5, 4, 6, 2, p.shield);
+    canvas.rect(4, 6, 8, 4, p.ironDark);
+    canvas.rect(5, 10, 6, 2, p.shield);
+    canvas.rect(7, 6, 2, 5, p.magic);
+    canvas.rect(6, 8, 4, 1, p.parchmentAged);
+    canvas.pixel(8, 12, p.shield);
+  },
+  "hand-purse"(canvas) {
+    canvas.rect(4, 6, 2, 5, p.parchmentAged);
+    canvas.rect(6, 4, 2, 7, p.parchmentAged);
+    canvas.rect(8, 6, 2, 5, p.parchmentAged);
+    canvas.rect(10, 8, 2, 3, p.parchmentAged);
+    canvas.rect(5, 10, 7, 3, p.oakDark);
+    canvas.rect(11, 4, 3, 3, p.goldDark);
+    canvas.pixel(12, 5, p.gold);
+  },
+  "bolt-shield"(canvas) {
+    canvas.rect(6, 4, 5, 8, p.ironDark);
+    canvas.rect(7, 5, 3, 6, p.iron);
+    canvas.line(3, 10, 13, 5, p.parchment);
+    canvas.line(4, 11, 14, 6, p.gold);
+    canvas.pixel(13, 4, p.parchmentAged);
+    canvas.pixel(14, 5, p.parchmentAged);
+  },
+  "fresh-palisade"(canvas) {
+    for (const left of [3, 6, 9, 12]) {
+      canvas.rect(left, 5, 2, 8, left % 3 ? p.oak : p.oakLight);
+      canvas.pixel(left, 4, p.parchmentAged);
+    }
+    canvas.rect(3, 9, 11, 2, p.ironDark);
+  },
+  "satchel-lantern"(canvas) {
+    canvas.rect(3, 6, 7, 7, p.parchmentAged);
+    canvas.rect(5, 5, 3, 2, p.oakDark);
+    canvas.rect(5, 8, 3, 1, p.oxblood);
+    canvas.rect(6, 7, 1, 3, p.oxblood);
+    canvas.rect(11, 5, 3, 6, p.goldDark);
+    canvas.rect(12, 6, 1, 3, p.gold);
+    canvas.pixel(12, 4, p.parchment);
+  },
+  "rogue-powder"(canvas) {
+    canvas.rect(3, 4, 5, 3, p.oakDark);
+    canvas.rect(2, 7, 7, 5, p.crew);
+    canvas.pixel(5, 5, p.parchment);
+    canvas.rect(10, 7, 4, 5, p.parchmentAged);
+    canvas.rect(11, 6, 2, 1, p.goldDark);
+    canvas.line(12, 6, 14, 3, p.oxblood);
+    canvas.pixel(14, 2, p.gold);
+  },
+  "cart-crates"(canvas) {
+    canvas.rect(3, 8, 10, 4, p.oakDark);
+    canvas.rect(4, 5, 4, 4, p.parchmentAged);
+    canvas.rect(9, 6, 4, 3, p.oakLight);
+    canvas.rect(4, 12, 3, 2, p.ironDark);
+    canvas.rect(10, 12, 3, 2, p.ironDark);
+    canvas.line(13, 5, 13, 10, p.parchment);
+    canvas.pixel(14, 5, p.crew);
+  },
+  "miners-keg"(canvas) {
+    canvas.rect(3, 4, 3, 2, p.goldDark);
+    canvas.rect(10, 4, 3, 2, p.goldDark);
+    canvas.pixel(4, 6, p.parchmentAged);
+    canvas.pixel(11, 6, p.parchmentAged);
+    canvas.rect(6, 7, 5, 6, p.oak);
+    canvas.rect(6, 8, 5, 1, p.ironDark);
+    canvas.rect(6, 11, 5, 1, p.ironDark);
+    canvas.pixel(8, 6, p.oxblood);
+  },
+  "forager-sack"(canvas) {
+    canvas.rect(5, 4, 5, 3, p.oakDark);
+    canvas.rect(4, 7, 7, 6, p.crew);
+    canvas.pixel(7, 5, p.parchment);
+    canvas.rect(10, 8, 4, 5, p.parchmentAged);
+    canvas.rect(11, 7, 2, 1, p.goldDark);
+    canvas.pixel(3, 10, p.gold);
+  },
+  "tent-banner"(canvas) {
+    canvas.line(7, 4, 2, 12, p.parchmentAged);
+    canvas.line(7, 4, 12, 12, p.oxblood);
+    canvas.rect(2, 12, 11, 1, p.oakDark);
+    canvas.rect(6, 9, 3, 4, p.charred);
+    canvas.line(12, 3, 12, 11, p.parchment);
+    canvas.rect(13, 4, 2, 2, p.crew);
+  },
+  "trebuchet-stones"(canvas) {
+    canvas.rect(3, 11, 9, 2, p.oakDark);
+    canvas.line(5, 11, 10, 4, p.oakLight);
+    canvas.line(10, 4, 13, 9, p.parchmentAged);
+    canvas.rect(3, 9, 3, 3, p.ironDark);
+    canvas.pixel(10, 3, p.stoneLight);
+    canvas.pixel(12, 3, p.stone);
+    canvas.pixel(13, 5, p.stoneLight);
+  },
+  "arrow-rain"(canvas) {
+    for (const [left, top] of [[4, 3], [8, 4], [12, 2]]) {
+      canvas.line(left, top, left - 1, top + 8, p.parchment);
+      canvas.pixel(left - 2, top + 8, p.gold);
+      canvas.pixel(left, top + 7, p.gold);
+      canvas.pixel(left, top, p.ironLight);
+    }
+  },
+  "anvil-bellows"(canvas) {
+    canvas.rect(4, 9, 8, 3, p.ironDark);
+    canvas.rect(6, 7, 5, 2, p.ironLight);
+    canvas.rect(7, 12, 3, 2, p.oakDark);
+    canvas.rect(3, 4, 4, 3, p.oxblood);
+    canvas.line(4, 7, 7, 10, p.oakLight);
+    canvas.pixel(12, 8, p.gold);
+  },
+  "bound-hourglass"(canvas) {
+    canvas.rect(4, 3, 8, 2, p.goldDark);
+    canvas.rect(4, 11, 8, 2, p.goldDark);
+    canvas.line(5, 5, 10, 11, p.parchmentAged);
+    canvas.line(10, 5, 5, 11, p.parchmentAged);
+    canvas.rect(7, 7, 2, 3, p.magic);
+    canvas.line(3, 4, 12, 12, p.oxblood);
+  },
+  "tower-brazier"(canvas) {
+    canvas.rect(5, 6, 7, 7, p.stoneDark);
+    canvas.rect(6, 7, 5, 5, p.stone);
+    canvas.rect(5, 4, 2, 3, p.stoneLight);
+    canvas.rect(8, 4, 2, 3, p.stone);
+    canvas.rect(11, 4, 2, 3, p.stoneLight);
+    canvas.rect(7, 10, 3, 3, p.charred);
+    canvas.rect(7, 3, 4, 1, p.goldDark);
+    canvas.pixel(8, 2, p.attack);
+    canvas.pixel(9, 1, p.gold);
   }
-}
+});
 
-function crewVariant(hint, seed) {
-  if (/anvil|hammer|bellows|forge/.test(hint)) return 0;
-  if (/alembic|furnace|reactor/.test(hint)) return 1;
-  if (/hood|gather|forager|sack/.test(hint)) return 2;
-  if (/chest|bandage|store|cache/.test(hint)) return 3;
-  if (/rampart|palisade|bulwark|block|tower/.test(hint)) return 4;
-  if (/healer|chirurgeon|satchel|lantern/.test(hint)) return 5;
-  if (/keg|miner|powder|rogue|sapper/.test(hint)) return 6;
-  if (/cart|crate|pennant|tent|camp|guild/.test(hint)) return 7;
-  if (/hand|coin|purse|cutpurse/.test(hint)) return 8;
-  return seed % 9;
-}
-
-function drawCrewMotif(canvas, x, y, variant, seed, theme) {
-  if (variant === 0) {
-    canvas.rect(x + 12, y + 27, 23, 5, p.ironDark);
-    canvas.rect(x + 16, y + 23, 15, 5, p.ironLight);
-    canvas.rect(x + 20, y + 32, 7, 5, p.oakDark);
-    canvas.line(x + 12, y + 11, x + 29, y + 27, p.oakLight);
-    canvas.rect(x + 9, y + 9, 7, 6, p.ironLight);
-  } else if (variant === 1) {
-    canvas.rect(x + 12, y + 25, 25, 11, p.oakDark);
-    canvas.rect(x + 15, y + 28, 19, 6, p.attack);
-    canvas.rect(x + 22, y + 11, 5, 15, p.parchment);
-    canvas.rect(x + 17, y + 10, 15, 5, p.shield);
-    canvas.rect(x + 19, y + 15, 11, 8, p.magic);
-  } else if (variant === 2) {
-    canvas.rect(x + 18, y + 13, 12, 10, p.oakDark);
-    canvas.rect(x + 15, y + 20, 18, 15, p.crew);
-    canvas.rect(x + 20, y + 16, 3, 3, p.parchment);
-    canvas.rect(x + 26, y + 16, 3, 3, p.parchment);
-    canvas.rect(x + 32, y + 24, 8, 11, p.parchmentAged);
-    canvas.rect(x + 34, y + 22, 4, 3, p.goldDark);
-  } else if (variant === 3) {
-    canvas.rect(x + 11, y + 18, 27, 18, p.oakDark);
-    canvas.rect(x + 13, y + 21, 23, 13, p.oak);
-    canvas.rect(x + 21, y + 17, 8, 5, p.goldDark);
-    canvas.rect(x + 22, y + 24, 6, 8, p.parchmentAged);
-    canvas.rect(x + 19, y + 27, 12, 2, theme.accent);
-  } else if (variant === 4) {
-    for (let column = 0; column < 5; column += 1) {
-      const height = 13 + ((seed >>> column) & 7);
-      canvas.rect(x + 8 + column * 7, y + 36 - height, 5, height, column % 2 ? p.stone : p.oakLight);
-      canvas.rect(x + 7 + column * 7, y + 16, 7, 3, p.ironLight);
+const WEAPON_MOTIFS = Object.freeze({
+  "iron-bombard"(canvas) {
+    canvas.rect(3, 10, 10, 2, p.oakDark);
+    canvas.rect(4, 12, 3, 2, p.ironDark);
+    canvas.rect(10, 12, 3, 2, p.ironDark);
+    canvas.line(5, 10, 12, 4, p.iron);
+    canvas.line(6, 10, 13, 4, p.ironLight);
+    canvas.rect(11, 3, 4, 3, p.goldDark);
+    canvas.pixel(14, 3, p.attack);
+  },
+  "three-archers"(canvas) {
+    for (const left of [3, 7, 11]) {
+      canvas.line(left, 4, left, 12, p.parchment);
+      canvas.line(left, 4, left + 2, 8, p.parchment);
+      canvas.line(left, 12, left + 2, 8, p.parchment);
+      canvas.line(left + 2, 8, left + 4, 8, p.ironLight);
     }
-  } else if (variant === 5) {
-    canvas.rect(x + 13, y + 16, 19, 20, p.parchmentAged);
-    canvas.rect(x + 20, y + 20, 5, 12, p.oxblood);
-    canvas.rect(x + 17, y + 23, 11, 5, p.oxblood);
-    canvas.rect(x + 31, y + 14, 7, 12, p.goldDark);
-    canvas.rect(x + 33, y + 12, 3, 3, p.gold);
-  } else if (variant === 6) {
-    canvas.rect(x + 11, y + 22, 19, 14, p.oak);
-    canvas.rect(x + 9, y + 19, 23, 5, p.ironDark);
-    canvas.rect(x + 15, y + 25, 4, 7, p.oxblood);
-    canvas.rect(x + 32, y + 16, 7, 13, p.parchmentAged);
-    canvas.pixel(x + 35, y + 13, p.gold);
-    canvas.pixel(x + 39, y + 10, p.attack);
-  } else if (variant === 7) {
-    canvas.rect(x + 10, y + 27, 27, 8, p.oakDark);
-    canvas.rect(x + 13, y + 22, 9, 7, p.parchmentAged);
-    canvas.rect(x + 24, y + 20, 10, 9, p.oakLight);
-    canvas.rect(x + 14, y + 35, 6, 3, p.ironDark);
-    canvas.rect(x + 30, y + 35, 6, 3, p.ironDark);
-    canvas.line(x + 36, y + 10, x + 36, y + 30, p.parchment);
-    canvas.rect(x + 37, y + 11, 7, 6, theme.accent);
-  } else {
-    canvas.rect(x + 13, y + 18, 7, 14, p.parchmentAged);
-    canvas.rect(x + 20, y + 14, 5, 18, p.parchmentAged);
-    canvas.rect(x + 25, y + 19, 5, 13, p.parchmentAged);
-    canvas.rect(x + 30, y + 23, 5, 9, p.parchmentAged);
-    canvas.rect(x + 16, y + 30, 17, 6, p.oakDark);
-    for (let coin = 0; coin < 3; coin += 1) canvas.rect(x + 10 + coin * 11, y + 12 + (coin % 2) * 4, 4, 4, p.gold);
+    canvas.rect(7, 3, 2, 2, p.gold);
   }
-}
+});
 
-function magicVariant(hint, seed) {
-  if (/shield|aegis|ward/.test(hint)) return 0;
-  if (/hourglass|time/.test(hint)) return 1;
-  if (/spire|thorn|blood/.test(hint)) return 2;
-  if (/bell|hush|silence|hex/.test(hint)) return 3;
-  if (/mirror|echo|twin|menhir|vine|stone/.test(hint)) return 4;
-  if (/lightning|storm|bolt/.test(hint)) return 5;
-  if (/vortex|void|gravity/.test(hint)) return 6;
-  if (/broken|cross|unmaking|null|counter/.test(hint)) return 7;
-  return seed % 8;
-}
-
-function drawMagicMotif(canvas, x, y, variant, seed, theme) {
-  if (variant === 0) {
-    canvas.rect(x + 14, y + 12, 20, 5, p.shield);
-    canvas.rect(x + 12, y + 16, 24, 10, p.ironDark);
-    canvas.rect(x + 16, y + 25, 16, 8, p.shield);
-    canvas.rect(x + 20, y + 18, 8, 10, p.magic);
-  } else if (variant === 1) {
-    canvas.rect(x + 14, y + 10, 20, 4, p.goldDark);
-    canvas.rect(x + 14, y + 33, 20, 4, p.goldDark);
-    canvas.line(x + 17, y + 14, x + 31, y + 33, p.parchmentAged);
-    canvas.line(x + 31, y + 14, x + 17, y + 33, p.parchmentAged);
-    canvas.rect(x + 21, y + 21, 6, 6, p.magic);
-  } else if (variant === 2) {
-    canvas.rect(x + 21, y + 12, 7, 24, p.oxblood);
-    canvas.rect(x + 18, y + 19, 13, 15, p.magic);
-    canvas.line(x + 21, y + 14, x + 13, y + 25, p.oxblood);
-    canvas.line(x + 28, y + 17, x + 37, y + 29, p.oxblood);
-    canvas.pixel(x + 24, y + 9, p.parchment);
-  } else if (variant === 3) {
-    canvas.rect(x + 17, y + 13, 14, 4, p.gold);
-    canvas.rect(x + 13, y + 17, 22, 13, p.goldDark);
-    canvas.rect(x + 20, y + 30, 8, 5, p.ironDark);
-    canvas.line(x + 9, y + 11, x + 38, y + 35, p.magic);
-    canvas.line(x + 11, y + 9, x + 40, y + 33, p.shield);
-  } else if (variant === 4) {
-    for (const left of [11, 27]) {
-      canvas.rect(x + left, y + 13, 10, 22, p.ironDark);
-      canvas.rect(x + left + 2, y + 15, 6, 18, p.magic);
-      canvas.rect(x + left + 4, y + 19, 2, 10, p.parchmentAged);
-    }
-    canvas.line(x + 21, y + 17, x + 27, y + 23, p.shield);
-    canvas.line(x + 21, y + 29, x + 27, y + 23, p.shield);
-  } else if (variant === 5) {
-    canvas.line(x + 27, y + 8, x + 16, y + 22, p.parchment);
-    canvas.line(x + 16, y + 22, x + 27, y + 22, p.shield);
-    canvas.line(x + 27, y + 22, x + 18, y + 38, p.parchment);
-    canvas.rect(x + 10, y + 11, 3, 3, p.magic);
-    canvas.rect(x + 35, y + 15, 4, 4, p.magic);
-    canvas.rect(x + 31, y + 32, 3, 3, p.magic);
-  } else if (variant === 6) {
-    for (let inset = 0; inset < 4; inset += 1) {
-      const color = inset % 2 ? p.magic : p.shield;
-      canvas.line(x + 24, y + 9 + inset * 3, x + 38 - inset * 3, y + 23, color);
-      canvas.line(x + 38 - inset * 3, y + 23, x + 24, y + 37 - inset * 3, color);
-      canvas.line(x + 24, y + 37 - inset * 3, x + 10 + inset * 3, y + 23, color);
-    }
-    canvas.rect(x + 21, y + 20, 7, 7, p.shadow);
-  } else {
-    canvas.line(x + 13, y + 11, x + 35, y + 35, p.magic);
-    canvas.line(x + 35, y + 11, x + 13, y + 35, p.shield);
-    canvas.rect(x + 20, y + 17, 8, 3, p.parchmentAged);
-    canvas.rect(x + 20, y + 27, 8, 3, p.parchmentAged);
-    canvas.pixel(x + 8 + (seed & 7), y + 24, p.parchment);
+const STRUCTURE_MOTIFS = Object.freeze({
+  "alembic-furnace"(canvas) {
+    canvas.rect(2, 8, 11, 6, p.oakDark);
+    canvas.rect(3, 9, 9, 4, p.attack);
+    canvas.rect(5, 10, 5, 3, p.charred);
+    canvas.rect(10, 3, 3, 6, p.ironDark);
+    canvas.pixel(11, 2, p.stoneLight);
+    canvas.rect(6, 6, 5, 3, p.shield);
+    canvas.rect(5, 14, 9, 1, p.shadow);
+  },
+  "vine-menhir"(canvas) {
+    canvas.rect(6, 3, 5, 11, p.ironDark);
+    canvas.rect(7, 2, 3, 11, p.stone);
+    canvas.line(8, 5, 8, 11, p.magic);
+    canvas.line(3, 14, 7, 10, p.crew);
+    canvas.line(13, 13, 9, 9, p.crew);
+    canvas.pixel(3, 12, p.parchment);
+    canvas.pixel(13, 11, p.parchment);
+    canvas.rect(4, 14, 9, 1, p.shadow);
+  },
+  "cart-crates"(canvas) {
+    canvas.rect(2, 8, 11, 4, p.oakDark);
+    canvas.rect(3, 5, 4, 4, p.parchmentAged);
+    canvas.rect(8, 6, 4, 3, p.oakLight);
+    canvas.rect(3, 12, 3, 2, p.ironDark);
+    canvas.rect(10, 12, 3, 2, p.ironDark);
+    canvas.line(13, 3, 13, 10, p.parchment);
+    canvas.rect(14, 4, 2, 3, p.crew);
+    canvas.rect(2, 14, 12, 1, p.shadow);
+  },
+  "tent-banner"(canvas) {
+    canvas.line(7, 3, 1, 13, p.parchmentAged);
+    canvas.line(7, 3, 13, 13, p.oxblood);
+    canvas.rect(1, 13, 13, 1, p.oakDark);
+    canvas.rect(6, 9, 3, 5, p.charred);
+    canvas.line(13, 2, 13, 12, p.parchment);
+    canvas.rect(14, 3, 2, 3, p.crew);
+    canvas.pixel(3, 12, p.gold);
+    canvas.rect(1, 14, 14, 1, p.shadow);
+  },
+  "anvil-bellows"(canvas) {
+    canvas.rect(2, 8, 12, 6, p.oakDark);
+    canvas.rect(4, 9, 5, 2, p.ironLight);
+    canvas.rect(5, 11, 3, 3, p.ironDark);
+    canvas.rect(10, 6, 3, 3, p.oxblood);
+    canvas.line(11, 9, 8, 12, p.oakLight);
+    canvas.line(3, 7, 7, 11, p.parchmentAged);
+    canvas.rect(2, 5, 4, 3, p.ironLight);
+    canvas.rect(2, 14, 12, 1, p.shadow);
+  },
+  "tower-brazier"(canvas) {
+    canvas.rect(4, 5, 8, 9, p.stoneDark);
+    canvas.rect(5, 6, 6, 8, p.stone);
+    for (const left of [4, 7, 10]) canvas.rect(left, 3, 2, 3, p.stoneLight);
+    canvas.rect(7, 10, 3, 4, p.charred);
+    canvas.rect(6, 2, 5, 1, p.goldDark);
+    canvas.pixel(8, 1, p.attack);
+    canvas.pixel(9, 0, p.gold);
+    canvas.rect(3, 14, 10, 1, p.shadow);
   }
-}
-
-function cardDraw(key, entry, index) {
-  const seed = seedFor("card", key, entry, index);
-  const hint = artHint(entry);
-  const theme = themeFor(entry.category);
-  return (canvas, x, y) => {
-    drawPortraitFrame(canvas, x, y, theme, seed, index);
-    if (entry.category === "attack") drawAttackMotif(canvas, x, y, attackVariant(hint, seed), seed, theme);
-    else if (entry.category === "magic") drawMagicMotif(canvas, x, y, magicVariant(hint, seed), seed, theme);
-    else drawCrewMotif(canvas, x, y, crewVariant(hint, seed), seed, theme);
-  };
-}
-
-function weaponDraw(key, entry, index) {
-  const seed = seedFor("weapon", key, entry, index);
-  const theme = themeFor("attack");
-  return (canvas, x, y) => {
-    drawPortraitFrame(canvas, x, y, theme, seed, index);
-    if (index % 2 === 0) {
-      canvas.rect(x + 8, y + 29, 28, 6, p.oakDark);
-      canvas.rect(x + 12, y + 34, 7, 6, p.ironDark);
-      canvas.rect(x + 29, y + 34, 7, 6, p.ironDark);
-      canvas.line(x + 15, y + 28, x + 37, y + 12, p.iron);
-      canvas.line(x + 16, y + 29, x + 38, y + 13, p.ironLight);
-      canvas.rect(x + 34, y + 9, 8, 8, p.goldDark);
-      canvas.pixel(x + 42, y + 9, p.attack);
-    } else {
-      for (let bow = 0; bow < 3; bow += 1) {
-        const left = x + 9 + bow * 10;
-        canvas.line(left, y + 15, left, y + 34, p.parchment);
-        canvas.line(left, y + 15, left + 5, y + 24, p.parchment);
-        canvas.line(left, y + 34, left + 5, y + 24, p.parchment);
-        canvas.line(left + 5, y + 24, left + 13, y + 24, bow === 1 ? p.gold : p.ironLight);
-      }
-    }
-  };
-}
-
-function structureVariant(hint, seed, category) {
-  if (category === "magic" || /menhir|rune|monolith|stone/.test(hint)) return 5;
-  if (/furnace|alembic|reactor/.test(hint)) return 0;
-  if (/tower|beacon|brazier/.test(hint)) return 1;
-  if (/camp|tent|out rider|outrider/.test(hint)) return 2;
-  if (/cart|crate|quartermaster|store|guild/.test(hint)) return 3;
-  if (/forge|anvil|bellows/.test(hint)) return 4;
-  return seed % 5;
-}
-
-function drawStructure(canvas, x, y, entry, seed, index) {
-  const theme = themeFor(entry.category);
-  const variant = structureVariant(artHint(entry), seed, entry.category);
-  canvas.rect(x + 5, y + 54, 54, 5, p.shadow);
-  canvas.rect(x + 9, y + 51, 46, 5, p.stoneDark);
-  if (variant === 0) {
-    canvas.rect(x + 14, y + 27, 38, 25, p.oakDark);
-    canvas.rect(x + 18, y + 31, 30, 17, p.attack);
-    canvas.rect(x + 24, y + 34, 18, 12, p.charred);
-    canvas.rect(x + 38, y + 11, 9, 22, p.ironDark);
-    canvas.rect(x + 40, y + 8, 5, 5, p.stoneLight);
-    canvas.rect(x + 26, y + 22, 12, 7, p.shield);
-  } else if (variant === 1) {
-    canvas.rect(x + 18, y + 19, 30, 34, p.stoneDark);
-    for (let row = 0; row < 3; row += 1) {
-      for (let column = 0; column < 3; column += 1) canvas.rect(x + 20 + column * 9 + (row % 2) * 3, y + 22 + row * 9, 7, 7, row % 2 ? p.stone : p.stoneLight);
-    }
-    for (let column = 0; column < 3; column += 1) canvas.rect(x + 18 + column * 11, y + 13, 8, 9, p.stone);
-    canvas.rect(x + 28, y + 38, 9, 15, p.charred);
-    canvas.rect(x + 27, y + 8, 12, 6, p.goldDark);
-    canvas.rect(x + 30, y + 5, 6, 5, p.attack);
-  } else if (variant === 2) {
-    for (let row = 0; row < 6; row += 1) canvas.rect(x + 17 - row, y + 24 + row * 5, 30 + row * 2, 5, row % 2 ? p.parchmentAged : p.oxblood);
-    canvas.line(x + 32, y + 18, x + 32, y + 52, p.oakDark);
-    canvas.rect(x + 11, y + 47, 12, 5, p.oak);
-    canvas.rect(x + 44, y + 44, 7, 7, p.goldDark);
-    canvas.pixel(x + 47, y + 42, p.gold);
-  } else if (variant === 3) {
-    canvas.rect(x + 9, y + 33, 43, 17, p.oakDark);
-    canvas.rect(x + 12, y + 27, 15, 16, p.oakLight);
-    canvas.rect(x + 30, y + 30, 17, 13, p.parchmentAged);
-    canvas.rect(x + 13, y + 49, 8, 7, p.ironDark);
-    canvas.rect(x + 41, y + 49, 8, 7, p.ironDark);
-    canvas.line(x + 52, y + 16, x + 52, y + 45, p.parchment);
-    canvas.rect(x + 53, y + 17, 8, 9, theme.accent);
-  } else if (variant === 4) {
-    canvas.rect(x + 12, y + 30, 42, 22, p.oakDark);
-    for (let row = 0; row < 5; row += 1) canvas.rect(x + 15 + row * 3, y + 25 - row * 3, 36 - row * 6, 4, row % 2 ? p.oxblood : p.oakLight);
-    canvas.rect(x + 17, y + 35, 14, 5, p.ironLight);
-    canvas.rect(x + 21, y + 40, 6, 8, p.ironDark);
-    canvas.line(x + 43, y + 31, x + 33, y + 45, p.parchmentAged);
-    canvas.rect(x + 41, y + 27, 7, 6, p.ironLight);
-  } else {
-    canvas.rect(x + 25, y + 13, 17, 39, p.ironDark);
-    canvas.rect(x + 28, y + 10, 11, 39, p.stone);
-    canvas.line(x + 33, y + 16, x + 33, y + 42, p.magic);
-    canvas.line(x + 27, y + 27, x + 39, y + 27, p.shield);
-    canvas.line(x + 18, y + 48, x + 29, y + 37, p.crew);
-    canvas.line(x + 48, y + 48, x + 38, y + 35, p.crew);
-    canvas.pixel(x + 21, y + 40, p.parchment);
-    canvas.pixel(x + 45, y + 34, p.parchment);
-  }
-  drawSignature(canvas, x + 20, y + 60, index, 3, theme.light, theme.dark);
-}
-
-function structureDraw(key, entry, index) {
-  const seed = seedFor("structure", key, entry, index);
-  return (canvas, x, y) => drawStructure(canvas, x, y, entry, seed, index);
-}
+});
 
 function entriesFor(record) {
   return Object.entries(record).sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
@@ -375,6 +359,34 @@ function expectCount(label, entries) {
   if (entries.length !== EXPECTED_COUNTS[label]) {
     throw new Error(`Expected ${EXPECTED_COUNTS[label]} ${label} in GAME_DATA, found ${entries.length}`);
   }
+}
+
+function expectExactArtTokens(label, entries, motifs) {
+  const expected = entries.map(([, entry]) => entry.art).sort();
+  const actual = Object.keys(motifs).sort();
+  const missing = expected.filter((token) => !actual.includes(token));
+  const extra = actual.filter((token) => !expected.includes(token));
+  if (missing.length || extra.length) {
+    throw new Error(`${label} art recipes mismatch: missing ${missing.join(", ") || "none"}; extra ${extra.join(", ") || "none"}`);
+  }
+}
+
+function cardDraw(entry) {
+  const motif = CARD_MOTIFS[entry.art];
+  const theme = themeFor(entry.category);
+  return (canvas) => {
+    drawPortraitFrame(canvas, theme);
+    motif(canvas);
+  };
+}
+
+function weaponDraw(entry) {
+  const motif = WEAPON_MOTIFS[entry.art];
+  const theme = themeFor("attack");
+  return (canvas) => {
+    drawPortraitFrame(canvas, theme);
+    motif(canvas);
+  };
 }
 
 function freezeRecipe(recipe) {
@@ -390,6 +402,9 @@ const structures = cards.filter(([, entry]) => entry.structure === true);
 expectCount("cards", cards);
 expectCount("weapons", weapons);
 expectCount("structures", structures);
+expectExactArtTokens("Card", cards, CARD_MOTIFS);
+expectExactArtTokens("Weapon", weapons, WEAPON_MOTIFS);
+expectExactArtTokens("Structure", structures, STRUCTURE_MOTIFS);
 
 const cardRecipe = freezeRecipe({
   atlas: { name: "cards", width: 384, height: 192, critical: false },
@@ -399,7 +414,8 @@ const cardRecipe = freezeRecipe({
     y: Math.floor(index / 8) * 48,
     width: 48,
     height: 48,
-    draw: cardDraw(key, entry, index)
+    pixelScale: 3,
+    draw: cardDraw(entry)
   }))
 });
 
@@ -411,7 +427,8 @@ const weaponRecipe = freezeRecipe({
     y: 0,
     width: 48,
     height: 48,
-    draw: weaponDraw(key, entry, index)
+    pixelScale: 3,
+    draw: weaponDraw(entry)
   }))
 });
 
@@ -423,7 +440,8 @@ const structureRecipe = freezeRecipe({
     y: 0,
     width: 64,
     height: 64,
-    draw: structureDraw(key, entry, index)
+    pixelScale: 4,
+    draw: STRUCTURE_MOTIFS[entry.art]
   }))
 });
 

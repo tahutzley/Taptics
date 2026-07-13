@@ -3,84 +3,75 @@
 const GAME_DATA = require("../../public/game-data.js");
 const p = require("./palette.js");
 
-function frame(canvas, x, y, color) {
-  canvas.rect(x + 2, y + 2, 28, 28, p.shadow);
-  canvas.rect(x + 4, y + 4, 24, 24, p.charred);
-  canvas.rect(x + 5, y + 5, 22, 2, color);
-}
-
+// Effect glyphs are authored on an 8x8 grid and enlarged four times by the
+// generator. Their surrounding UI already supplies state frames, so these
+// recipes stay transparent and devote the full sprite to one readable mark.
 const draws = {
-  projectile(canvas, x, y) {
-    frame(canvas, x, y, p.attack);
-    canvas.line(x + 7, y + 23, x + 24, y + 8, p.parchment);
-    canvas.line(x + 20, y + 8, x + 24, y + 8, p.gold);
-    canvas.line(x + 24, y + 8, x + 24, y + 12, p.gold);
-    canvas.line(x + 7, y + 23, x + 12, y + 23, p.oak);
+  projectile(canvas) {
+    canvas.line(1, 6, 6, 1, p.parchment);
+    canvas.rect(4, 1, 3, 1, p.gold);
+    canvas.rect(6, 1, 1, 3, p.gold);
+    canvas.pixel(0, 6, p.oak);
+    canvas.pixel(1, 7, p.oak);
   },
-  siege(canvas, x, y) {
-    frame(canvas, x, y, p.oxblood);
-    canvas.rect(x + 6, y + 20, 20, 4, p.oakDark);
-    canvas.line(x + 8, y + 20, x + 21, y + 8, p.ironLight);
-    canvas.rect(x + 20, y + 6, 6, 6, p.stoneLight);
-    canvas.rect(x + 8, y + 10, 5, 5, p.stone);
+  siege(canvas) {
+    canvas.rect(1, 6, 6, 1, p.oakDark);
+    canvas.line(2, 5, 5, 2, p.ironLight);
+    canvas.rect(5, 1, 2, 2, p.stoneLight);
+    canvas.rect(1, 4, 2, 2, p.stone);
   },
-  restore(canvas, x, y) {
-    frame(canvas, x, y, p.healing);
-    canvas.rect(x + 14, y + 8, 5, 17, p.parchment);
-    canvas.rect(x + 8, y + 14, 17, 5, p.parchment);
-    canvas.pixel(x + 6, y + 24, p.shield);
-    canvas.pixel(x + 25, y + 24, p.shield);
+  restore(canvas) {
+    canvas.rect(3, 1, 2, 6, p.parchment);
+    canvas.rect(1, 3, 6, 2, p.parchment);
+    canvas.pixel(2, 2, p.healing);
+    canvas.pixel(5, 5, p.shield);
   },
-  build(canvas, x, y) {
-    frame(canvas, x, y, p.crew);
-    canvas.rect(x + 7, y + 20, 18, 5, p.stone);
-    canvas.rect(x + 9, y + 14, 14, 5, p.stoneLight);
-    canvas.line(x + 9, y + 9, x + 23, y + 23, p.oak);
-    canvas.rect(x + 7, y + 7, 9, 5, p.ironLight);
+  build(canvas) {
+    canvas.line(2, 1, 6, 5, p.oakLight);
+    canvas.rect(1, 1, 3, 2, p.ironLight);
+    canvas.rect(4, 5, 3, 2, p.stone);
+    canvas.pixel(6, 4, p.crew);
   },
-  resource(canvas, x, y) {
-    frame(canvas, x, y, p.gold);
-    for (const [left, top] of [[7, 16], [13, 9], [18, 17]]) {
-      canvas.rect(x + left, y + top, 8, 8, p.goldDark);
-      canvas.rect(x + left + 2, y + top + 2, 4, 4, p.gold);
+  resource(canvas) {
+    for (const [x, y] of [[1, 4], [3, 1], [5, 4]]) {
+      canvas.rect(x, y, 2, 2, p.goldDark);
+      canvas.pixel(x + 1, y, p.gold);
     }
+    canvas.rect(2, 6, 4, 1, p.oakDark);
   },
-  buff(canvas, x, y) {
-    frame(canvas, x, y, p.attack);
-    canvas.rect(x + 7, y + 13, 8, 11, p.oxblood);
-    canvas.rect(x + 18, y + 13, 8, 11, p.oxblood);
-    canvas.rect(x + 8, y + 11, 6, 4, p.parchmentAged);
-    canvas.rect(x + 19, y + 11, 6, 4, p.parchmentAged);
-    canvas.line(x + 7, y + 8, x + 15, y + 14, p.oakLight);
-    canvas.line(x + 26, y + 8, x + 18, y + 14, p.oakLight);
+  buff(canvas) {
+    canvas.rect(1, 3, 2, 3, p.oxblood);
+    canvas.rect(5, 3, 2, 3, p.oxblood);
+    canvas.pixel(1, 2, p.parchmentAged);
+    canvas.pixel(6, 2, p.parchmentAged);
+    canvas.line(1, 1, 4, 4, p.oakLight);
+    canvas.line(6, 1, 3, 4, p.gold);
   },
-  delay(canvas, x, y) {
-    frame(canvas, x, y, p.magic);
-    canvas.rect(x + 9, y + 7, 14, 3, p.parchmentAged);
-    canvas.rect(x + 9, y + 23, 14, 3, p.parchmentAged);
-    canvas.line(x + 11, y + 10, x + 21, y + 23, p.parchment);
-    canvas.line(x + 21, y + 10, x + 11, y + 23, p.parchment);
-    canvas.rect(x + 14, y + 15, 4, 5, p.gold);
+  delay(canvas) {
+    canvas.rect(1, 1, 6, 1, p.parchmentAged);
+    canvas.rect(1, 6, 6, 1, p.parchmentAged);
+    canvas.line(2, 2, 5, 5, p.parchment);
+    canvas.line(5, 2, 2, 5, p.parchment);
+    canvas.rect(3, 4, 2, 2, p.gold);
   },
-  counter(canvas, x, y) {
-    frame(canvas, x, y, p.magic);
-    canvas.line(x + 8, y + 8, x + 24, y + 24, p.parchment);
-    canvas.line(x + 24, y + 8, x + 8, y + 24, p.parchment);
-    canvas.rect(x + 14, y + 12, 5, 9, p.magic);
+  counter(canvas) {
+    canvas.line(1, 1, 6, 6, p.parchment);
+    canvas.line(6, 1, 1, 6, p.shield);
+    canvas.rect(3, 3, 2, 2, p.magic);
   },
-  ritual(canvas, x, y) {
-    frame(canvas, x, y, p.oxblood);
-    canvas.line(x + 16, y + 7, x + 25, y + 23, p.magic);
-    canvas.line(x + 25, y + 23, x + 7, y + 23, p.magic);
-    canvas.line(x + 7, y + 23, x + 16, y + 7, p.magic);
-    canvas.rect(x + 14, y + 15, 5, 6, p.gold);
+  ritual(canvas) {
+    canvas.line(4, 1, 7, 6, p.magic);
+    canvas.line(7, 6, 1, 6, p.magic);
+    canvas.line(1, 6, 4, 1, p.magic);
+    canvas.rect(3, 4, 2, 2, p.gold);
+    canvas.pixel(4, 0, p.oxblood);
   },
-  echo(canvas, x, y) {
-    frame(canvas, x, y, p.shield);
-    canvas.line(x + 11, y + 8, x + 18, y + 16, p.magic);
-    canvas.line(x + 18, y + 16, x + 11, y + 24, p.magic);
-    canvas.line(x + 22, y + 8, x + 15, y + 16, p.shield);
-    canvas.line(x + 15, y + 16, x + 22, y + 24, p.shield);
+  echo(canvas) {
+    canvas.line(1, 1, 4, 4, p.magic);
+    canvas.line(4, 4, 1, 7, p.magic);
+    canvas.line(5, 1, 2, 4, p.shield);
+    canvas.line(2, 4, 5, 7, p.shield);
+    canvas.pixel(6, 4, p.parchment);
   }
 };
 
@@ -91,5 +82,13 @@ for (const family of families) {
 
 module.exports = {
   atlas: { name: "effects", width: families.length * 32, height: 32, critical: true },
-  sprites: families.map((family, index) => ({ name: `family-${family}`, x: index * 32, y: 0, width: 32, height: 32, draw: draws[family] }))
+  sprites: families.map((family, index) => ({
+    name: `family-${family}`,
+    x: index * 32,
+    y: 0,
+    width: 32,
+    height: 32,
+    pixelScale: 4,
+    draw: draws[family]
+  }))
 };

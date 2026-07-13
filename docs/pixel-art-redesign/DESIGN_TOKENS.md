@@ -26,9 +26,11 @@ Attack uses a pointed ember frame and crossed-bolt icon; Crew uses a square timb
 ## Geometry and materials
 
 - Base layout grid: 4 CSS pixels.
-- Logical art sizes: 16px UI icons, 32px minor actors/effects, 48px portraits, 64px cores/walls/primary structures.
+- Runtime output slots remain 16px UI icons, 32px minor actors/effects, 48px portraits, and 64px cores/primary structures so layout and sprite classes stay stable.
+- Source recipes use deliberately coarse 8x8, 12x12, or 16x16 logical grids. The generator expands each sprite into its existing slot at the declared 2x, 3x, or 4x nearest-neighbor `pixelScale`.
+- Every rendered block is uniform across its declared scale. Motifs use a one-logical-cell minimum stroke, one dominant silhouette, at most one secondary cue, and no seeded texture or nonsemantic signature pixels.
 - Runtime art uses integer-scale background sizing and `image-rendering: pixelated`.
-- Frames use a two-pixel dark keyline, one- or two-pixel material highlight, stepped/clipped corners, and a hard 4px shadow.
+- Frames use a one-logical-cell dark keyline, a restrained material highlight, stepped/clipped corners, and a hard 4px UI shadow.
 - Parchment owns information/details; timber and iron own controls; stone owns defenses/meters; cloth owns identity/results; rune stone owns Magic.
 
 ## Type

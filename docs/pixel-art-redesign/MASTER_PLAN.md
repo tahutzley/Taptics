@@ -8,6 +8,7 @@ This directory is the durable implementation plan for the medieval pixel-art red
 - The user authorized a complete card-name refactor. Canonical keys remain stable for protocol, resolver, CPU, asset, and saved-profile compatibility; all 29 player-facing names and related copy change to the approved siege-ledger set in `CARD_INVENTORY.md` during Phase 4.
 - Server snapshots remain authoritative. Presentation events are additive and may never predict resources, damage, or outcomes.
 - Original runtime art is generated deterministically from repository source. No generative image output or third-party artwork is shipped.
+- Generated sprite slots and runtime classes remain stable while source recipes use explicit coarse logical grids and nearest-neighbor 2x/3x/4x expansion. Catalogue art routes by exact art token so every card, weapon, and structure keeps a distinct readable silhouette without seeded texture noise.
 
 ## Phase status
 
@@ -30,6 +31,7 @@ This directory is the durable implementation plan for the medieval pixel-art red
 - Selected weapon only; distinct Crew and Magic zones; eight structure slots.
 - Stable delegated hand input and server-authoritative snapshots.
 - Scalable viewport, visible focus, non-color state grammar, large targets, restrained live status, and reduced-motion equivalence.
+- Deterministic 69-sprite coverage, fixed atlas topology, explicit per-sprite pixel scale, and uniform coarse-pixel blocks.
 
 ## Verification gates
 

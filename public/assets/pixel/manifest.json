@@ -1,7 +1,7 @@
 {
-  "version": 1,
+  "schema": "taptics-pixel-art-manifest",
+  "version": 2,
   "generatedBy": "scripts/pixel-art/generate.js",
-  "logicalScale": 1,
   "palette": {
     "transparent": "#00000000",
     "shadow": "#0c0a08",
@@ -31,48 +31,48 @@
       "file": "ui-atlas.png",
       "width": 256,
       "height": 64,
-      "bytes": 1128,
-      "sha256": "737791cbec21ffa70868613d075874137c3b1eed5c572bddc378afd3caa63885",
+      "bytes": 952,
+      "sha256": "0f02c49164afbda3007216581bf40afbb71581b44deac05b6cabb3be9804e7cc",
       "critical": true
     },
     "battle": {
       "file": "battle-atlas.png",
       "width": 256,
       "height": 128,
-      "bytes": 1388,
-      "sha256": "9b1c3655a96a20756ddaf80c458f4e657d553d426cc8d3adf25c4f63320509f9",
+      "bytes": 1144,
+      "sha256": "e61acd56778be280a7b8d0cd32bab337030c98f9aebdea3ce8072efdc69a2e14",
       "critical": true
     },
     "effects": {
       "file": "effects-atlas.png",
       "width": 320,
       "height": 32,
-      "bytes": 1003,
-      "sha256": "b25546ce50bbab0b67fc6f7efdd59ead546f17db3cdcf8220cdbec55ca969051",
+      "bytes": 622,
+      "sha256": "181722102fac75a935e6f9860b9acca21efd1310aca65d7f9f751e9fcfe78e4d",
       "critical": true
     },
     "cards": {
       "file": "cards-atlas.png",
       "width": 384,
       "height": 192,
-      "bytes": 5144,
-      "sha256": "e310b77c205b3fabab0b11bb05bb9cc513ad8edde95ea634c2b5812d80f1cdb9",
+      "bytes": 3435,
+      "sha256": "c196b627cf803488d55ae11db85559b9084959152d088c4fc5886e1e51d311a1",
       "critical": false
     },
     "weapons": {
       "file": "weapons-atlas.png",
       "width": 96,
       "height": 48,
-      "bytes": 546,
-      "sha256": "8d779f04814241ef22317e22fffc7db52d6082f714e06ba0055533de88cde841",
+      "bytes": 349,
+      "sha256": "634aa78f47eda3ec1781d3e9f7707d3c121d83b7856bd2c4daa015c53fd1c276",
       "critical": true
     },
     "structures": {
       "file": "structures-atlas.png",
       "width": 384,
       "height": 64,
-      "bytes": 1256,
-      "sha256": "b9e5fa9bf40f78121ac08c7cb40a8c35bd0330033bde48efe865065ec7575031",
+      "bytes": 960,
+      "sha256": "05ff0b7c6475b61e54a69cf7141915b8d2041a6696536154bb523eee32da8aca",
       "critical": true
     }
   },
@@ -83,8 +83,11 @@
       "y": 16,
       "width": 16,
       "height": 16,
-      "sha256": "745f67f431c3c7557f35522af610444108cb7b7568d89071ed90d38c0d02f753",
-      "opaquePixels": 98
+      "pixelScale": 2,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "3120cd6682534cf66211f01c28437873d8f6d0728ed71a79f77ef58ba7d3ab61",
+      "opaquePixels": 184
     },
     "portrait-fallback": {
       "atlas": "ui",
@@ -92,7 +95,10 @@
       "y": 0,
       "width": 48,
       "height": 48,
-      "sha256": "766ce139ac85533ee20c18144dfb5b59fda7da13898e676e21a42a1d32e4af2a",
+      "pixelScale": 4,
+      "logicalWidth": 12,
+      "logicalHeight": 12,
+      "sha256": "6648171f3d11d1e38fc5c3c7964f7479c621bf06132de9a700febce2697976c0",
       "opaquePixels": 2304
     },
     "crest": {
@@ -101,8 +107,11 @@
       "y": 0,
       "width": 32,
       "height": 32,
-      "sha256": "a9dc081f492793ed478b856a6b4145852ea715bbc16cbbd005f0fc2b46eadd29",
-      "opaquePixels": 664
+      "pixelScale": 2,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "770bdde27872deac9c752566aa85bea83e5153fe8816519c453f5946ebd62fc7",
+      "opaquePixels": 656
     },
     "nav-battle": {
       "atlas": "ui",
@@ -110,8 +119,11 @@
       "y": 0,
       "width": 16,
       "height": 16,
-      "sha256": "c04b96bd8694b78ed25276bff2cd1ceba6e0e6beb10aec23f3aec7daace78ebb",
-      "opaquePixels": 58
+      "pixelScale": 2,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "f0965c46231cf1ee00c9fbb9fafb94da939e7b8bf0328f9285e2c05e85f0cae6",
+      "opaquePixels": 80
     },
     "nav-deck": {
       "atlas": "ui",
@@ -119,8 +131,11 @@
       "y": 0,
       "width": 16,
       "height": 16,
-      "sha256": "d2bf72d7f6763469a29db4d43dfdb86d2d0ddba2530cbcf613edd0ca73efb908",
-      "opaquePixels": 165
+      "pixelScale": 2,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "bab30eeae0289d964ade7de91c3910ab4f652ec81dede6cb1c69cc92bbbdff39",
+      "opaquePixels": 204
     },
     "nav-challenge": {
       "atlas": "ui",
@@ -128,8 +143,11 @@
       "y": 0,
       "width": 16,
       "height": 16,
-      "sha256": "57641fa9140762b3c09cdb2634c0efff8258c185433586f054eb04e04e1de9f2",
-      "opaquePixels": 124
+      "pixelScale": 2,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "5859fdc600dc257180ab12f2a12042b39f4fb2f15db09d222c50dbe90ddd5138",
+      "opaquePixels": 144
     },
     "sound-on": {
       "atlas": "ui",
@@ -137,8 +155,11 @@
       "y": 0,
       "width": 16,
       "height": 16,
-      "sha256": "21751eec5bc18147de1e2338dc9e53a11702b3cd001d7be51b8b085598939a02",
-      "opaquePixels": 54
+      "pixelScale": 2,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "c038f38cc590b6074ab89d730abc9c6a32b4469744265b30bd9440219d442512",
+      "opaquePixels": 88
     },
     "sound-off": {
       "atlas": "ui",
@@ -146,8 +167,11 @@
       "y": 0,
       "width": 16,
       "height": 16,
-      "sha256": "55c2cff6b404537207c73f637042db0af74421e80a2cfc13720a9473341ad21e",
-      "opaquePixels": 60
+      "pixelScale": 2,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "89a60592af3d1eaf903f2fbd8995386c101450a667f5f5220ca6a8f7ce590e14",
+      "opaquePixels": 96
     },
     "status-search": {
       "atlas": "ui",
@@ -155,8 +179,11 @@
       "y": 0,
       "width": 16,
       "height": 16,
-      "sha256": "ab8909bfbd94178d43487af24ac145ea297e70424cfdf57e05ed31074bed8e9c",
-      "opaquePixels": 58
+      "pixelScale": 2,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "6103ad0324d65db9c535758b35544ffc8004c673ab68c51b7efb721c936f169e",
+      "opaquePixels": 56
     },
     "result-victory": {
       "atlas": "ui",
@@ -164,8 +191,11 @@
       "y": 16,
       "width": 32,
       "height": 32,
-      "sha256": "c0c61ba429f305cc7ebea35c11e5923ec861d06d51c1bf5c309a7d1cbc8a097e",
-      "opaquePixels": 315
+      "pixelScale": 2,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "add3dff00c0d4be18941bf6f56d1eed586edd3a9602c555b92f074e770eaf8c1",
+      "opaquePixels": 396
     },
     "result-defeat": {
       "atlas": "ui",
@@ -173,8 +203,11 @@
       "y": 16,
       "width": 32,
       "height": 32,
-      "sha256": "307d3cfd7f7fa7e45a1bd87b641f5569df8135d3f6c059c15e4ca51cefb42f96",
-      "opaquePixels": 498
+      "pixelScale": 2,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "ef43f70459b888ba72dd3c0e52613b563ee9502689b97d887742096951429cfa",
+      "opaquePixels": 596
     },
     "result-draw": {
       "atlas": "ui",
@@ -182,8 +215,11 @@
       "y": 16,
       "width": 32,
       "height": 32,
-      "sha256": "467e2265e56da32a2f09cd7a6da5ddf7aac3e9ce3df1d44f0f7fbdc46a473da0",
-      "opaquePixels": 270
+      "pixelScale": 2,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "893bc6122e6e5be954a163f5a38e92d95383b0fab8c6f25ee8341b5a039722b6",
+      "opaquePixels": 384
     },
     "battle-core": {
       "atlas": "battle",
@@ -191,8 +227,11 @@
       "y": 0,
       "width": 64,
       "height": 64,
-      "sha256": "dbef93e28c523fcca53ed33ce5347d2808438cffc00e3f50caead7612d24bd40",
-      "opaquePixels": 3093
+      "pixelScale": 4,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "eac6c1a2609d6c34cf8941a70bdb55b2399533bd7fee5d058c3f88ca20f3a13f",
+      "opaquePixels": 3008
     },
     "battle-wall": {
       "atlas": "battle",
@@ -200,8 +239,11 @@
       "y": 0,
       "width": 64,
       "height": 32,
-      "sha256": "22838deeba0fbe90693669ca6598077eb18f929cb7ab19a77c5e201e0ae88d8e",
-      "opaquePixels": 1908
+      "pixelScale": 4,
+      "logicalWidth": 16,
+      "logicalHeight": 8,
+      "sha256": "cdc6ee07a379d8d675ac1cf06b29c01cf034588f01259bc020114f5a84dcb851",
+      "opaquePixels": 2048
     },
     "battle-shield": {
       "atlas": "battle",
@@ -209,8 +251,11 @@
       "y": 0,
       "width": 64,
       "height": 32,
-      "sha256": "ac98ce4d3b3fa0ff11566385df8ed9b53428a3a4071e6df9898bbfea9be3cbac",
-      "opaquePixels": 432
+      "pixelScale": 4,
+      "logicalWidth": 16,
+      "logicalHeight": 8,
+      "sha256": "9743c7b1e16037c3ffe25b5f6bfd8873b812d45befc4e02e581236e88c0edd2b",
+      "opaquePixels": 640
     },
     "battle-cannon": {
       "atlas": "battle",
@@ -218,8 +263,11 @@
       "y": 0,
       "width": 48,
       "height": 48,
-      "sha256": "fabfccb083134b681e37b643eb0684c90336acbf809dd130e2fa15ec70885125",
-      "opaquePixels": 489
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "aa7799e13c650368505f5d084f4b074a7f69d4d29c8454f2018888bef2092980",
+      "opaquePixels": 792
     },
     "battle-volley": {
       "atlas": "battle",
@@ -227,8 +275,11 @@
       "y": 64,
       "width": 48,
       "height": 48,
-      "sha256": "c537a7063e1326300d1f3face6d64a31d2cd4df71a2a2a7f6ca881f09d76dfb2",
-      "opaquePixels": 685
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "29f481bbbb64995bff45662590bc08bcb42056cad72bb50f9d31db76b4edf128",
+      "opaquePixels": 792
     },
     "battle-crew": {
       "atlas": "battle",
@@ -236,8 +287,11 @@
       "y": 64,
       "width": 32,
       "height": 32,
-      "sha256": "5282e45ff357072d7e9e9d0b9bdbc2f55efaeba523a38a1cf212c24de4fc7d3c",
-      "opaquePixels": 505
+      "pixelScale": 4,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "fb198bc85bd1291d5aa5a5e95fab8f35562aa4a2fd7c3b5b95863ceb5d439004",
+      "opaquePixels": 480
     },
     "battle-rune": {
       "atlas": "battle",
@@ -245,8 +299,11 @@
       "y": 64,
       "width": 32,
       "height": 32,
-      "sha256": "198d7173d8cfbc82457d2e5145fd91afbebe8451d8d9db3e9e63a0de5b6a2359",
-      "opaquePixels": 151
+      "pixelScale": 4,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "0fa5058e73d8c8f908936fd36cfc5a076385839a9a3055ea4b65a536772a8946",
+      "opaquePixels": 432
     },
     "effect-impact": {
       "atlas": "battle",
@@ -254,8 +311,11 @@
       "y": 64,
       "width": 32,
       "height": 32,
-      "sha256": "277ecde11c80d11005d95613dede2d4c6bd4789b5bf0bdd809f37afdf01f5465",
-      "opaquePixels": 404
+      "pixelScale": 4,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "feee24975571ab71b75e8251768a15993bbc19d6a6ce0dc06e932769ef2c42f5",
+      "opaquePixels": 704
     },
     "effect-debris": {
       "atlas": "battle",
@@ -263,8 +323,11 @@
       "y": 64,
       "width": 32,
       "height": 32,
-      "sha256": "1bfff18d11b5d314550d19a00af6b1b5713c1ba71ac7314b3dd6ffda73537524",
-      "opaquePixels": 225
+      "pixelScale": 4,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "38789912e7ee8c839b25b8d3a94476c975d52eecc1b37d8ba4a5bca78b1d1e41",
+      "opaquePixels": 656
     },
     "effect-siphon-pip": {
       "atlas": "battle",
@@ -272,8 +335,11 @@
       "y": 64,
       "width": 16,
       "height": 16,
-      "sha256": "ee9be2cf44a85fd0db32cc540156ee604b8fba270e5e4d27f6368cf212c48abd",
-      "opaquePixels": 100
+      "pixelScale": 2,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "0ec191d0f4b6bfb0ba63ab5b71914cb17e2d44ca6528f6145cd82fedc2328e2e",
+      "opaquePixels": 144
     },
     "family-projectile": {
       "atlas": "effects",
@@ -281,8 +347,11 @@
       "y": 0,
       "width": 32,
       "height": 32,
-      "sha256": "d6a02dc956284e22f932f685d4707b0feb4c7b830b9206d3ddd6cde01448dcb4",
-      "opaquePixels": 784
+      "pixelScale": 4,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "86027a6032d51e02f7fc5ff931def10441741081446f0ce0db5607340d47c778",
+      "opaquePixels": 192
     },
     "family-siege": {
       "atlas": "effects",
@@ -290,8 +359,11 @@
       "y": 0,
       "width": 32,
       "height": 32,
-      "sha256": "1b624e269f2118cbe0b47680139b49ff6c73c30ebf39b2d9659d90739ddfc22e",
-      "opaquePixels": 784
+      "pixelScale": 4,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "05396d798976cae6c2d23629a08b703fdcfc06c3028576127c8fec1c85926256",
+      "opaquePixels": 256
     },
     "family-restore": {
       "atlas": "effects",
@@ -299,8 +371,11 @@
       "y": 0,
       "width": 32,
       "height": 32,
-      "sha256": "ddef430838f457339362571c4f1ddaf93a8e61dadd4cfe2404cc2869b985ccc4",
-      "opaquePixels": 784
+      "pixelScale": 4,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "fbfb24fb3062e99e398a965fe0cb2bfc954f463a183c23283c59d51c498e2c7b",
+      "opaquePixels": 352
     },
     "family-build": {
       "atlas": "effects",
@@ -308,8 +383,11 @@
       "y": 0,
       "width": 32,
       "height": 32,
-      "sha256": "90c2043399c4d6fc1cfa0066186d754d66fbb619462807dfbe7caa4a64faa848",
-      "opaquePixels": 784
+      "pixelScale": 4,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "e5126d563d83f91f81ac09b232ba8da4938911e8eff5afe588ddaeb429c18506",
+      "opaquePixels": 240
     },
     "family-resource": {
       "atlas": "effects",
@@ -317,8 +395,11 @@
       "y": 0,
       "width": 32,
       "height": 32,
-      "sha256": "6bae646e76699c02aad76cb459d423ab8ba7317ff8040d76ff0f1ad0262f757c",
-      "opaquePixels": 784
+      "pixelScale": 4,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "0df8b00870e45e41ce6152e83d457403cded9280df4f41621b23041bdc4364a9",
+      "opaquePixels": 256
     },
     "family-buff": {
       "atlas": "effects",
@@ -326,8 +407,11 @@
       "y": 0,
       "width": 32,
       "height": 32,
-      "sha256": "56fccf6d565a16de7252a6f64fcc506c95d9b6dbfa3be7145e19289c901a2039",
-      "opaquePixels": 784
+      "pixelScale": 4,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "0ef173c9ef1386f3693f799ff3ef9def2b5dfea0b809acce32576383c8c6e383",
+      "opaquePixels": 352
     },
     "family-delay": {
       "atlas": "effects",
@@ -335,8 +419,11 @@
       "y": 0,
       "width": 32,
       "height": 32,
-      "sha256": "e08d26962e1b589c157167a8b7eb5c058618c7b83404a2da4cde145bafec8558",
-      "opaquePixels": 784
+      "pixelScale": 4,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "a10603e710dfeb4b8dbfd61106a3fae2e1e186734cddd84049248845af1f846c",
+      "opaquePixels": 352
     },
     "family-counter": {
       "atlas": "effects",
@@ -344,8 +431,11 @@
       "y": 0,
       "width": 32,
       "height": 32,
-      "sha256": "1cfd68c053cefaea83cb741703bf257cb80061066c9e01b59d2b325a642a3ae4",
-      "opaquePixels": 784
+      "pixelScale": 4,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "74384af70b34776ff504da8bf29d026037a5b04bba5b5fd1d68b7bda06fe407f",
+      "opaquePixels": 192
     },
     "family-ritual": {
       "atlas": "effects",
@@ -353,8 +443,11 @@
       "y": 0,
       "width": 32,
       "height": 32,
-      "sha256": "06038dd82a22a7573f1cde438f8b8257d02acc892e73e62620a3aa4a3411371b",
-      "opaquePixels": 784
+      "pixelScale": 4,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "2bb72215f03efa1c37f16af04cfa8a3dbf3653ff5f0d6ef9457e7f3ba4528ab0",
+      "opaquePixels": 336
     },
     "family-echo": {
       "atlas": "effects",
@@ -362,8 +455,11 @@
       "y": 0,
       "width": 32,
       "height": 32,
-      "sha256": "6ee7a0a7a4c0f6cc3436e6ffaafef95663a6c539685a8f7cb4917fcb3e30d9a0",
-      "opaquePixels": 784
+      "pixelScale": 4,
+      "logicalWidth": 8,
+      "logicalHeight": 8,
+      "sha256": "daf3106bf84f6e2a270cac1685f9d5b7319521b2c7134cea8016a6d3b562fa46",
+      "opaquePixels": 208
     },
     "card-arcLightning": {
       "atlas": "cards",
@@ -371,7 +467,10 @@
       "y": 0,
       "width": 48,
       "height": 48,
-      "sha256": "46d19599f85732d02cff2dae17026de28932b0876ad8b3d15d1e9dff12ff9c73",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "e3d0919c7eaea7ce9bd39dc6dfc275ab31d0ae0a6f88daca2b614e9534d796a1",
       "opaquePixels": 2304
     },
     "card-berserker": {
@@ -380,7 +479,10 @@
       "y": 0,
       "width": 48,
       "height": 48,
-      "sha256": "578eead3525ec180289bebfa18c65bc73f986e26de977179e1596ebb00c9019a",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "b858860b85943dae37a90f788eb4a46bf8faf1fb53448261e1ec32e0624b9f52",
       "opaquePixels": 2304
     },
     "card-bulwark": {
@@ -389,7 +491,10 @@
       "y": 0,
       "width": 48,
       "height": 48,
-      "sha256": "de5d6f18dd16c099584ac74912f6e13113461af32ef03d480dbd1e622ec86ab7",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "99bcf3ae6e7a82cd89f93b7dda597f892d9f3a9fb88e9bca3be585bb69aa558a",
       "opaquePixels": 2304
     },
     "card-echoRelay": {
@@ -398,7 +503,10 @@
       "y": 0,
       "width": 48,
       "height": 48,
-      "sha256": "9e717282cb5f232535c612a6c3c027e719bb864dfdf096846196d9f11029f31f",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "5087414c1b18e5f4addf90a3314bfa5036d54512c8196523cc19f241da7436c5",
       "opaquePixels": 2304
     },
     "card-emergencyCache": {
@@ -407,7 +515,10 @@
       "y": 0,
       "width": 48,
       "height": 48,
-      "sha256": "fac7aea9efdb5c46ff9fd6095dfb1c702b94d15b969da33ea31b6757353e2d68",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "5dc74f4b5f75fa7f0af15bd9eb6a39d65b57d59a0e3b51e2a15fc8f62d5d7503",
       "opaquePixels": 2304
     },
     "card-executionOrder": {
@@ -416,7 +527,10 @@
       "y": 0,
       "width": 48,
       "height": 48,
-      "sha256": "25e1c28a2c45fb990324a21a823ac75d00769ef5f925ff4a5d3f620be8c6b667",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "f9a1b818a6148c6df268386be9bcdacb8bf413cd22e787ca4385f48fef0ec66b",
       "opaquePixels": 2304
     },
     "card-glassReactor": {
@@ -425,7 +539,10 @@
       "y": 0,
       "width": 48,
       "height": 48,
-      "sha256": "079a9d3233d045d5b5a32bff3ed96c053f4da5ebd608af4871ad2db17e7608a7",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "76d5ba95f1e9986111fe37a0ae09857798f923a737ffdf3870851d461add5811",
       "opaquePixels": 2304
     },
     "card-gravityWell": {
@@ -434,7 +551,10 @@
       "y": 0,
       "width": 48,
       "height": 48,
-      "sha256": "adf108f5edd3252093004a8e9eb671f9d18efbf5958c2763569ffdd5b2285117",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "ee2d4b6cfcc1d88ab99d2909ad79e8212942135931c508c0637677430f9a3160",
       "opaquePixels": 2304
     },
     "card-growthRune": {
@@ -443,7 +563,10 @@
       "y": 48,
       "width": 48,
       "height": 48,
-      "sha256": "a651169e9bd2bb868b15f137b68b83b8e2c91d592cc1fb3596d931d21823f53a",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "97cbe964b4fd02ad7eea415f9323c820d4065d2625222bb65458cf492924229a",
       "opaquePixels": 2304
     },
     "card-jammer": {
@@ -452,7 +575,10 @@
       "y": 48,
       "width": 48,
       "height": 48,
-      "sha256": "a171f26c476f88fe7938fe8e0b19fe47f9b1ed66e17725c6c0711d61a52ebe6c",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "412b805c773fd1e086742c1d2970f9fb06fc1d13d556e060b7b129e5d5fdfe95",
       "opaquePixels": 2304
     },
     "card-leechSpire": {
@@ -461,7 +587,10 @@
       "y": 48,
       "width": 48,
       "height": 48,
-      "sha256": "1e8c9243a2b9083848cecf0dbbca50b23354579b07852a2819a868a762dcf644",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "8e8b76dfdaaec3226669c45c0a8c8df5e7f7560b24d3cf1c01302f5564e2f146",
       "opaquePixels": 2304
     },
     "card-masonCrew": {
@@ -470,7 +599,10 @@
       "y": 48,
       "width": 48,
       "height": 48,
-      "sha256": "6c6b4b02dcd054cf3e5e514bf0302e6478ee5f9f18318a59a41d4579ba7d95e3",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "5eaff957fcb447e3b1931cf511cfbcc82011332d9b26f1b11e2d95d86746bbe1",
       "opaquePixels": 2304
     },
     "card-nullSigil": {
@@ -479,7 +611,10 @@
       "y": 48,
       "width": 48,
       "height": 48,
-      "sha256": "b9b6b58691caaad66d0c719f651987c17bb015438491099f860529ca4c1e313e",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "e1a78f482804a908fb11c80510b13eb58c27e2b2b2013dbc9e1f04de2c13282a",
       "opaquePixels": 2304
     },
     "card-overclock": {
@@ -488,7 +623,10 @@
       "y": 48,
       "width": 48,
       "height": 48,
-      "sha256": "2965dca41bdab8e43f810fa7cbe82a70a6c9a296e3c85a14df58d591b7ac1bf1",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "49d94047a095a789f38c975c19815d0278805d2686a7d723e8e6c86a31ef0cf8",
       "opaquePixels": 2304
     },
     "card-phaseShield": {
@@ -497,7 +635,10 @@
       "y": 48,
       "width": 48,
       "height": 48,
-      "sha256": "f43dcd10492d60f85aed264ee6b7f78f186389a59593d0e417260416ef484a3b",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "9038852584e19fb1939d12b9704d2740638960a2c1f43a7010d439fbb19b9576",
       "opaquePixels": 2304
     },
     "card-pickpockets": {
@@ -506,7 +647,10 @@
       "y": 48,
       "width": 48,
       "height": 48,
-      "sha256": "7aaccb879a98f52b5913b3e270a2288259367b2dee84438b68a7fe89f99470f2",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "2a1f36849a814fd7af2d201d277f83bb7c2411da216e317ba3fc516d05c2cdd0",
       "opaquePixels": 2304
     },
     "card-piercingShot": {
@@ -515,7 +659,10 @@
       "y": 96,
       "width": 48,
       "height": 48,
-      "sha256": "9d42bd9f68712128f838698520077848685110bfb0892dcf8ee586c3cf4757d4",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "685c6007dcaf666982cc77c8f1756cfc01f8a81c8f90ee7e11c735437e3f15d4",
       "opaquePixels": 2304
     },
     "card-rampart": {
@@ -524,7 +671,10 @@
       "y": 96,
       "width": 48,
       "height": 48,
-      "sha256": "4ede6eb18ec0e97709abf1c9034f573b01688c254fbc783cbf3a5c125a28d232",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "656f8b834649cf9da4f285968553a1fe1f25f72acbf3e1d4fd1a4d02b3675562",
       "opaquePixels": 2304
     },
     "card-repairDrone": {
@@ -533,7 +683,10 @@
       "y": 96,
       "width": 48,
       "height": 48,
-      "sha256": "a1b874a990d8611de975a7915921c01ac65c6a02a6db9bd058bda756ac337846",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "246c854e2ad87c309d3270340411aad75cffa77b10fe6a9fb24bde99fca8d39e",
       "opaquePixels": 2304
     },
     "card-saboteur": {
@@ -542,7 +695,10 @@
       "y": 96,
       "width": 48,
       "height": 48,
-      "sha256": "52bf7be05eeaae5a2b51002cf501c8b1ed872f7221eca1eebffba1bcad84e50e",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "b2fdbdded733d0cc76a84b649e9554b66fdf74a6788bb14f2e716e6030ef80fd",
       "opaquePixels": 2304
     },
     "card-salvageGuild": {
@@ -551,7 +707,10 @@
       "y": 96,
       "width": 48,
       "height": 48,
-      "sha256": "e07d8f8da6905ec7774d5aef70d015ff70961c126a874da969ef4a2aca3b966e",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "d89363ea270658baf632f37b32efeaeb5df8f71531558d64b6a4fdd46e3d649d",
       "opaquePixels": 2304
     },
     "card-sappers": {
@@ -560,7 +719,10 @@
       "y": 96,
       "width": 48,
       "height": 48,
-      "sha256": "fdcc416eac6dd80ffa504dd288808fa3048e0ffefa24d18dac89cf297ceb697d",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "54a041e485dbc826804611188bcd3a9a681bc76e447f35649e23151702079614",
       "opaquePixels": 2304
     },
     "card-scavenger": {
@@ -569,7 +731,10 @@
       "y": 96,
       "width": 48,
       "height": 48,
-      "sha256": "cd9210500e6c8b620bea04b96c4b8bb596f6270a45654bb01c67fb871d3d5ba2",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "7a3a421fc52682fe2c2f5e752958b33f2e79a0c4f74174e587ac3f0ffedf33ed",
       "opaquePixels": 2304
     },
     "card-scoutCamp": {
@@ -578,7 +743,10 @@
       "y": 96,
       "width": 48,
       "height": 48,
-      "sha256": "676036cf835ced8a5a7795499938255d4bc0d4d8dd3313074a2bf968a3cf6b2a",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "3dfd66ddf0862f36b022932aea463ecd4df57886099466f9f9b8b9f60bd04dac",
       "opaquePixels": 2304
     },
     "card-siegeSalvo": {
@@ -587,7 +755,10 @@
       "y": 144,
       "width": 48,
       "height": 48,
-      "sha256": "1cbe865dac63fd17c5e8d89347c0e47f8d456a504b518610077e83dcc5da168c",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "156abfa05c9a5b6096a1e54fa65e7f0feb3f790ed6d1de79a5fbab4be38cb68d",
       "opaquePixels": 2304
     },
     "card-suppressingFire": {
@@ -596,7 +767,10 @@
       "y": 144,
       "width": 48,
       "height": 48,
-      "sha256": "9bc15a271d437f9fd1e99e98004ae2d1b9da9e5c3871c02aec062413645ee647",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "f6ecd894ec9d9537ade29e3ba38f428a634e0861fae05e1e74bc0c459d1dae3b",
       "opaquePixels": 2304
     },
     "card-tapForge": {
@@ -605,7 +779,10 @@
       "y": 144,
       "width": 48,
       "height": 48,
-      "sha256": "e3c4f2eab0fa4e97def865aba7ae32c4bba30af78cab8bd7637615a6a3f4dbcb",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "e35c48a6dd11a6635ae4ec530d9cef37772e093a48960df9f895f094799a2580",
       "opaquePixels": 2304
     },
     "card-timeBomb": {
@@ -614,7 +791,10 @@
       "y": 144,
       "width": 48,
       "height": 48,
-      "sha256": "13ff57b050c0fcc6f8abed282c7666dea9b31caf2b96b3321ec3d7679410d110",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "920048638f08a8ae6ad0390fc4dea6f39516ca8ffe47dc878f4265e1cff20ab6",
       "opaquePixels": 2304
     },
     "card-watchtower": {
@@ -623,7 +803,10 @@
       "y": 144,
       "width": 48,
       "height": 48,
-      "sha256": "4a40575de3645649c42a85ba15433767a9ce07f0ac89089f2daa4529fda02333",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "1072fea82791dd0a2403a1a5c91b2ad3a5b6659bf479d17cc6c1d01892e97ee5",
       "opaquePixels": 2304
     },
     "weapon-cannon": {
@@ -632,7 +815,10 @@
       "y": 0,
       "width": 48,
       "height": 48,
-      "sha256": "f8088d3a7c4db2d0cddfc12deaf0d1f09b8d7949aaceda37bb57cd0cb8f1577a",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "6198ec1e5adfdf1646f51366f99cbb39f6b5374f57808017e638cc589454bf22",
       "opaquePixels": 2304
     },
     "weapon-volley": {
@@ -641,7 +827,10 @@
       "y": 0,
       "width": 48,
       "height": 48,
-      "sha256": "a389a73c0b9c9cb7a00f7a22103e5f9d6caa100bb6c8857453879e20cd10d8e5",
+      "pixelScale": 3,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "dadf1ceffd1871d0035ae943ab0f9fda9322a6fd5f5961eb842f88269fb5e5c6",
       "opaquePixels": 2304
     },
     "structure-glassReactor": {
@@ -650,8 +839,11 @@
       "y": 0,
       "width": 64,
       "height": 64,
-      "sha256": "ef2e425ce564d00e79768934b433f9f9af96d1fac1dec68b9869185e4f678679",
-      "opaquePixels": 1563
+      "pixelScale": 4,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "900ff181ab5f95ea69c56624377386a4e203828c59cd551f8fe4c23a9d2718eb",
+      "opaquePixels": 1584
     },
     "structure-growthRune": {
       "atlas": "structures",
@@ -659,8 +851,11 @@
       "y": 0,
       "width": 64,
       "height": 64,
-      "sha256": "861b59a9b172ad29d9f4a39d76e237ba6a311f5b91afca21f154e651624b215b",
-      "opaquePixels": 1129
+      "pixelScale": 4,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "923b7dfce7942dedba9992c6467b9ba1b2fc1f0a4e55c97c207f173e1f3bc658",
+      "opaquePixels": 1200
     },
     "structure-salvageGuild": {
       "atlas": "structures",
@@ -668,8 +863,11 @@
       "y": 0,
       "width": 64,
       "height": 64,
-      "sha256": "409e9b9e0ab6ccb0e23b62aa52a9273b7194f6b98153aa88285f87e6916fe80d",
-      "opaquePixels": 1422
+      "pixelScale": 4,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "9b17d9f5f3c72e1d870d864fb545e42e93f171175bb78b9bdd0c96ac9ed4fa95",
+      "opaquePixels": 1632
     },
     "structure-scoutCamp": {
       "atlas": "structures",
@@ -677,8 +875,11 @@
       "y": 0,
       "width": 64,
       "height": 64,
-      "sha256": "17ac31b5b1a0af369793e7ef3a7c653ddccf188e0bbdfaf8529c8cfe98cca27a",
-      "opaquePixels": 1374
+      "pixelScale": 4,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "6744d9325d609aaf6ce842e0a98e4de82e2e1f83814d98efa5cc71483bf269b6",
+      "opaquePixels": 1216
     },
     "structure-tapForge": {
       "atlas": "structures",
@@ -686,8 +887,11 @@
       "y": 0,
       "width": 64,
       "height": 64,
-      "sha256": "44d419f163f351abbca57825d1ba5f77210cc5f33a07f9c1bf33ce0fc5721cea",
-      "opaquePixels": 1717
+      "pixelScale": 4,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "fbd234b14c461a7cfab6f1b206747fcb3551b7d881c405a502557e697570a522",
+      "opaquePixels": 1632
     },
     "structure-watchtower": {
       "atlas": "structures",
@@ -695,8 +899,11 @@
       "y": 0,
       "width": 64,
       "height": 64,
-      "sha256": "061acd1301d5b7d9e5a6a0c8c09d99b521ccfb52544ec298ea64a816e7c23e65",
-      "opaquePixels": 1618
+      "pixelScale": 4,
+      "logicalWidth": 16,
+      "logicalHeight": 16,
+      "sha256": "ab308704b55b3498f6aee9d190aba54f290639ebe793a7c740415fa7230da0fd",
+      "opaquePixels": 1616
     }
   }
 }

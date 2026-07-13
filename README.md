@@ -13,7 +13,7 @@ Open `http://localhost:3000`. **Battle CPU** starts an authoritative server-simu
 
 ## Main menu
 
-The medieval siege-ledger home screen centers the player's local ELO, online matchmaking, and CPU training using original pixel icons, parchment, timber, iron, stone, and heraldic cloth. A compact daily challenge and active loadout sit below the battle controls. Persistent bottom navigation switches between Battle and the full-screen six-card Deck builder at any time; Challenges is visible but disabled for now. The Deck builder has no separate back control and keeps **Save Loadout** above the full card library.
+The medieval siege-ledger home screen centers the player's local ELO, online matchmaking, and CPU training using bold low-resolution pixel icons, parchment, timber, iron, stone, and heraldic cloth. A compact daily challenge and active loadout sit below the battle controls. Persistent bottom navigation switches between Battle and the full-screen six-card Deck builder at any time; Challenges is visible but disabled for now. The Deck builder has no separate back control and keeps **Save Loadout** above the full card library.
 
 The quartermaster-style Deck screen shows the six-card draw order, both permanent weapons, category filters, all 29 illustrated cards, and a complete card-details surface. Cards have separate Details and Add/Remove controls; selected cards can move left or right with pointer or keyboard controls. Only a valid six-unique-card order can be saved. Unsaved drafts survive Battle navigation and reloads while battles continue using the last saved loadout. Opening Deck cancels active matchmaking so a queued stale loadout cannot interrupt editing; **Restore Saved Loadout** explicitly discards a draft.
 
@@ -104,6 +104,6 @@ npm run test:browser
 
 The browser check uses an installed Microsoft Edge and writes ignored responsive captures under `artifacts/browser/`.
 
-All shipped raster art is original deterministic output from the repository's pixel pipeline. The runtime generates no artwork and fetches no remote fonts, images, or third-party visual assets.
+All shipped raster art is original deterministic output from the repository's coarse-grid pixel pipeline. Small 8x8 to 16x16 source glyphs are enlarged into stable runtime slots with nearest-neighbor blocks; the runtime generates no artwork and fetches no remote fonts, images, or third-party visual assets.
 
 The Socket.IO server owns matchmaking, deck validation, hand and queue order, tap validation, regeneration, card cycling, wind-ups, effects, damage, CPU decisions, and match results. Shared definitions live in `public/game-data.js` so the builder, client, and server use identical card data.

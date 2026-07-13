@@ -1,6 +1,6 @@
 # Card naming, art, and effect inventory
 
-Canonical keys below remain stable. Phase 4 applied every display name, short label, medieval description, portrait, and effect-family mapping together, so saved decks and Socket.IO payloads remain compatible. `public/game-data.js` is the executable source of truth; this table is the durable inventory and review aid.
+Canonical keys below remain stable. Phase 4 applied every display name, short label, medieval description, portrait, and effect-family mapping together, so saved decks and Socket.IO payloads remain compatible. `public/game-data.js` is the executable source of truth; this table is the durable inventory and review aid. Each exact `art` token now selects one explicit 16x16 portrait glyph, expanded 3x into the existing 48x48 slot. Seeded scratches and signature strips are forbidden; uniqueness comes from the item silhouette itself.
 
 | Category | Canonical key | Display name | Short | Portrait motif | Effect family |
 | --- | --- | --- | --- | --- | --- |
