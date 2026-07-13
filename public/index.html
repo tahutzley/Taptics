@@ -2,74 +2,141 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#09111f" />
-    <title>Taptics — Tap. Build. Conquer.</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#090d16" />
+    <meta name="description" content="Taptics is a real-time 1v1 strategy game where every tap is a finite resource." />
+    <title>Taptics - Every tap is a decision</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700;800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
     <main class="app-shell">
-      <section id="lobby" class="lobby panel">
-        <div class="brand-mark"><span>⚡</span></div>
-        <p class="eyebrow">REAL-TIME TAP STRATEGY</p>
-        <h1>TAP<span>TACTICS</span></h1>
-        <p class="tagline">Tap for power. Build your line. Break their core.</p>
-        <button id="solo-button" class="button primary"><span>▶</span> Battle CPU</button>
-        <button id="online-button" class="button secondary"><span>◉</span> Find Random Rival</button>
-        <p id="queue-message" class="queue-message"></p>
-        <div class="how-to">
-          <div><b>1</b><span>Tap a lane for energy, damage, or defense.</span></div>
-          <div><b>2</b><span>Spend energy to deploy a winning push.</span></div>
-          <div><b>3</b><span>Destroy the enemy Core before time runs out.</span></div>
-        </div>
-      </section>
-
-      <section id="game" class="game hidden">
-        <header class="topbar">
-          <div class="fighter enemy"><span class="avatar">☠</span><div><small id="enemy-label">ENEMY</small><b id="enemy-hp">1000</b></div></div>
-          <div class="timer-wrap"><span id="mode-label">SOLO BATTLE</span><strong id="timer">3:00</strong></div>
-          <div class="fighter"><div class="right"><small>YOUR CORE</small><b id="own-hp">1000</b></div><span class="avatar player">⚡</span></div>
+      <section id="lobby" class="lobby screen">
+        <header class="lobby-header">
+          <a class="brand" href="#" aria-label="Taptics home"><span class="brand-mark">T</span><span>TAPTICS<small>FIELD PROTOTYPE // 02</small></span></a>
+          <div class="header-actions"><button id="open-deck" class="icon-button">DECK</button><button id="sound-toggle" class="icon-button" aria-label="Toggle sound">SOUND ON</button></div>
         </header>
 
-        <section class="arena panel">
-          <div class="side-label left">YOUR BASE</div><div class="side-label right">ENEMY BASE</div>
-          <div id="enemy-tower" class="tower enemy-tower hidden">⌁</div>
-          <div id="own-tower" class="tower own-tower hidden">⌁</div>
-          <div id="enemy-core" class="core enemy-core"><i></i><span>CORE</span></div>
-          <div id="own-core" class="core own-core"><i></i><span>CORE</span></div>
-          <div class="bridge bridge-one"></div><div class="bridge bridge-two"></div>
-          <div id="units" class="units"></div>
-          <div class="lane-divider"></div>
+        <section class="hero">
+          <p class="eyebrow"><span></span> REAL-TIME RESOURCE DUEL</p>
+          <h1>EVERY TAP<br /><em>IS A DECISION.</em></h1>
+          <p class="hero-copy">You have one finite tap reserve. Invest it, defend with it, or turn it into pressure before your rival reads the play.</p>
+          <div class="match-buttons">
+            <button id="solo-button" class="primary-cta"><span>PLAY CPU</span><small>2-4 min elimination duel</small><i>-></i></button>
+            <button id="online-button" class="secondary-cta"><span>FIND RIVAL</span><small id="queue-message">Real-time online 1v1</small></button>
+          </div>
         </section>
 
-        <section class="resource-row panel">
-          <div class="energy-wrap"><div class="energy-title">ENERGY <span id="energy-value">6.0</span><span>/ 10</span></div><div class="meter"><div id="energy-bar" class="meter-fill"></div></div></div>
-          <div class="heat-wrap"><div class="heat-title">TAP HEAT <span id="heat-value">0</span>%</div><div class="meter heat"><div id="heat-bar" class="meter-fill"></div></div></div>
+        <section class="record-strip" aria-label="Player record">
+          <div><small>DUELS</small><strong id="stat-duels">0</strong></div>
+          <div><small>WIN RATE</small><strong id="stat-winrate">--</strong></div>
+          <div><small>CURRENT RUN</small><strong id="stat-run">0</strong></div>
+          <div><small>BEST RUN</small><strong id="stat-best">0</strong></div>
         </section>
 
-        <section class="tap-zone panel">
-          <button class="tap-button active" data-tap="mine"><span>⛏</span><b>MINE</b><small>+ Energy</small></button>
-          <button class="tap-button" data-tap="pulse"><span>✦</span><b>PULSE</b><small>Hit foes</small></button>
-          <button class="tap-button" data-tap="build"><span>⌂</span><b>BUILD</b><small>Repair / shield</small></button>
-          <button id="tap-action" class="tap-action"><span id="tap-icon">⛏</span><b id="tap-title">TAP TO MINE</b><small id="tap-copy">Gain energy for your deck</small></button>
+        <section class="loadout-panel panel">
+          <div class="section-label"><span>ACTIVE SIX-CARD CYCLE</span><button id="edit-deck">EDIT LOADOUT</button></div>
+          <div id="loadout-deck" class="loadout-deck"></div>
+          <div class="loadout-weapon"><span>ALWAYS AVAILABLE</span><b id="loadout-weapon-name">CANNON</b><small id="loadout-weapon-copy">Heavy, efficient pressure</small></div>
         </section>
 
-        <section class="deck" id="deck">
-          <button class="card teal" data-card="scout"><span class="cost">4</span><span class="card-icon">◆</span><b>SCOUT</b><small>Fast unit</small></button>
-          <button class="card orange" data-card="ram"><span class="cost">7</span><span class="card-icon">⬟</span><b>RAM</b><small>Core damage</small></button>
-          <button class="card purple" data-card="swarm"><span class="cost">5</span><span class="card-icon">✦</span><b>SWARM</b><small>3 fast units</small></button>
-          <button class="card blue" data-card="tower"><span class="cost">8</span><span class="card-icon">⌁</span><b>TOWER</b><small>Defend base</small></button>
-          <button class="card gold" data-card="shield"><span class="cost">5</span><span class="card-icon">◈</span><b>SHIELD</b><small>45% reduction</small></button>
+        <section class="field-test panel">
+          <div class="section-label"><span>OPTIONAL FIELD TEST</span><b id="challenge-status">0 / 1</b></div>
+          <div class="challenge-row">
+            <div class="challenge-icon">+</div>
+            <div><h2 id="challenge-title">Win without a second Forge</h2><p id="challenge-copy">A constraint for your next training duel. No reward treadmill - just a new way to master the system.</p></div>
+          </div>
         </section>
-        <p class="tip">Tap choices are strategic: mining funds units; pulse stops pushes; build sustains your base.</p>
+
+        <section class="rules">
+          <div class="section-label"><span>THE ELIMINATION ARC</span><b>3 PHASES</b></div>
+          <article><b>01</b><div><h3>FORTIFY <span>0:00-0:25</span></h3><p>Damage is softened, but early attacks still hurt. Choose economy or immediate pressure.</p></div></article>
+          <article><b>02</b><div><h3>CLASH <span>0:25-2:00</span></h3><p>Full damage. Cannons are more tap-efficient than rebuilding Walls indefinitely.</p></div></article>
+          <article><b>03</b><div><h3>OVERLOAD <span>2:00+</span></h3><p>Damage escalates and Walls weaken. At 3:00, Double Taps multiplies all tap generation by two.</p></div></article>
+        </section>
+
+        <footer class="prototype-note">Built to test strategic tension, not progression pressure. Matches are fair, complete, and free of paid power.</footer>
+      </section>
+
+      <section id="game" class="game screen hidden">
+        <header class="battle-header">
+          <button id="leave-battle" class="back-button" aria-label="Leave battle"><span>&lt;</span></button>
+          <div class="fighter enemy-fighter"><div class="fighter-name"><span id="enemy-plan">ADAPTIVE CPU</span><b id="enemy-label">THE ARCHITECT</b></div><div class="fighter-meters"><div class="core-meter"><i id="enemy-core-bar"></i></div><div class="mini-tap-meter" aria-label="Rival tap reserve"><i id="enemy-tap-bar"></i></div></div><small><span id="enemy-core-value">360</span> CORE <span class="meter-key">TAP RESERVE</span></small></div>
+          <div class="clock"><small id="mode-label">TRAINING</small><strong id="timer">0:00</strong></div>
+        </header>
+
+        <section class="phase-banner" id="phase-banner"><span id="phase-number">01</span><div><small id="phase-kicker">OPENING PHASE</small><b id="phase-name">FORTIFY</b></div><p id="phase-rule">Damage reduced 25%</p></section>
+
+        <section id="arena" class="arena panel" aria-label="Battlefield">
+          <div class="grid-lines"></div>
+          <div class="frontline"><span>FRONTLINE</span></div>
+          <div class="base enemy-base">
+            <div id="enemy-weapon" class="weapon-zone cannon" aria-label="Rival weapon and Attack commitment"><i class="weapon-barrel"></i><span class="weapon-label">C</span><span class="volley-team"><i></i><i></i><i></i></span><em class="visual-load"></em></div>
+            <div class="core enemy-core"><span>RIVAL</span><b id="enemy-core-board">360</b></div>
+            <div id="enemy-crew" class="lane-zone crew-zone" aria-label="Rival Crew commitment"><span class="crew-people"><i class="worker"></i><i class="scout"></i><i class="builder"></i></span><b>CREW</b><em class="visual-load"></em></div>
+            <div id="enemy-magic" class="lane-zone magic-zone" aria-label="Rival Magic commitment"><span class="rune-mark"></span><b>MAGIC</b><em class="visual-load"></em></div>
+            <div id="enemy-structures" class="structure-grid" aria-label="Rival structure tiles"></div>
+            <div id="enemy-wall" class="wall enemy-wall" aria-label="Rival Wall"><i></i><b id="enemy-wall-value">35</b></div>
+          </div>
+          <div id="enemy-projectile" class="projectile enemy-projectile"></div>
+          <div id="own-projectile" class="projectile own-projectile"></div>
+          <div class="base own-base">
+            <div id="own-wall" class="wall own-wall" aria-label="Your Wall"><i></i><b id="own-wall-value">35</b></div>
+            <div id="own-weapon" class="weapon-zone cannon" aria-label="Your weapon and Attack commitment"><i class="weapon-barrel"></i><span class="weapon-label">C</span><span class="volley-team"><i></i><i></i><i></i></span><em class="visual-load"></em></div>
+            <div class="core own-core"><span>YOU</span><b id="own-core-board">360</b></div>
+            <div id="own-crew" class="lane-zone crew-zone" aria-label="Your Crew commitment"><span class="crew-people"><i class="worker"></i><i class="scout"></i><i class="builder"></i></span><b>CREW</b><em class="visual-load"></em></div>
+            <div id="own-magic" class="lane-zone magic-zone" aria-label="Your Magic commitment"><span class="rune-mark"></span><b>MAGIC</b><em class="visual-load"></em></div>
+            <div id="own-structures" class="structure-grid" aria-label="Your structure tiles"></div>
+          </div>
+          <div id="impact-flash" class="impact-flash"></div>
+        </section>
+
+        <section class="reserve panel">
+          <div class="reserve-top"><div><small>YOUR TAP RESERVE</small><strong><span id="tap-value">10</span><i>/ 40</i></strong></div><div class="regen"><small>REGEN</small><b id="regen-value">+0.78/s</b></div></div>
+          <div class="reserve-meter"><i id="tap-bar"></i><span id="reserve-notches"></span></div>
+          <p id="reserve-hint" role="status" aria-live="polite">Spend before the reserve caps or regeneration is wasted.</p>
+        </section>
+
+        <section class="action-section">
+          <div class="section-label"><span>THREE-CARD HAND</span><b id="next-card-label">NEXT: --</b></div>
+          <div class="hand-row"><div id="battle-hand" class="battle-hand"></div><button id="weapon-card" class="weapon-card" data-source="weapon"><span id="weapon-short">C</span><div><small>WEAPON</small><b id="weapon-name">CANNON</b></div><em id="weapon-cost">8</em><i class="action-progress"></i></button></div>
+          <button id="commit-button" class="commit-button">
+            <span class="tap-ripple"></span><small>TAP TO COMMIT</small><strong id="commit-title">SELECT A CARD</strong><em id="commit-progress">0 / 0 TAPS</em>
+          </button>
+          <p class="commit-note" id="commit-note">Complete a card to play it and send it to the bottom of your six-card cycle.</p>
+        </section>
+
+        <footer class="own-status"><div><small>YOUR CORE</small><b><span id="own-core-value">360</span> HP</b></div><div class="core-meter own"><i id="own-core-bar"></i></div><div><small>WALL</small><b><span id="own-wall-footer">35</span> HP</b></div></footer>
       </section>
     </main>
 
-    <div id="result-modal" class="modal hidden"><div class="result panel"><p id="result-kicker" class="eyebrow">BATTLE COMPLETE</p><h2 id="result-title">VICTORY!</h2><p id="result-copy"></p><div id="crate" class="crate"><span>✦</span><b>Basic Crate</b><small>250 taps to open</small></div><button id="again-button" class="button primary">Battle Again</button><button id="lobby-button" class="text-button">Return to lobby</button></div></div>
+    <div id="result-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="result-title">
+      <section class="result-card">
+        <p id="result-kicker" class="eyebrow"><span></span> DUEL COMPLETE</p>
+        <h2 id="result-title">VICTORY</h2>
+        <p id="result-copy">You converted pressure into a decisive core advantage.</p>
+        <div class="result-score"><div><small>YOUR CORE</small><b id="result-own-core">0</b></div><span>:</span><div><small>RIVAL CORE</small><b id="result-enemy-core">0</b></div></div>
+        <div class="result-stats"><div><small>TAPS SPENT</small><b id="result-taps">0</b></div><div><small>DAMAGE</small><b id="result-damage">0</b></div><div><small>CAP WASTE</small><b id="result-waste">0s</b></div></div>
+        <div class="battle-read"><small>TACTICAL READ</small><p id="result-read">Your reserve stayed useful throughout the match.</p></div>
+        <button id="again-button" class="primary-cta"><span>RUN IT BACK</span><small id="again-copy">New CPU plan, same rules</small><i>-></i></button>
+        <button id="lobby-button" class="text-button">Return to field terminal</button>
+      </section>
+    </div>
+    <div id="deck-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="deck-builder-title">
+      <section class="deck-builder-modal">
+        <header><div><p class="eyebrow"><span></span> LOADOUT LAB</p><h2 id="deck-builder-title">BUILD YOUR CYCLE</h2></div><button id="close-deck" aria-label="Close deck builder">X</button></header>
+        <p class="deck-builder-copy">Choose six unique cards across Attack, Crew, and Magic. Only one action in each lane can be committed at a time.</p>
+        <div class="weapon-builder"><div class="section-label"><span>PERMANENT WEAPON SLOT</span><b>ALWAYS AVAILABLE</b></div><div id="weapon-options" class="weapon-options"><button data-weapon="cannon">CANNON<small>8 taps / heavy hit</small></button><button data-weapon="volley">VOLLEY<small>3 taps / fast hit</small></button></div></div>
+        <div class="builder-selection"><div class="section-label"><span>YOUR DECK</span><b id="builder-count">6 / 6</b></div><div id="builder-deck" class="builder-deck"></div></div>
+        <div class="card-library-wrap"><div class="section-label"><span>PROTOTYPE CARD SET</span><b id="library-count">29 CARDS</b></div><div id="card-library" class="card-library"></div></div>
+        <button id="save-deck" class="primary-cta"><span>SAVE LOADOUT</span><small>Use this cycle in CPU and online battles</small><i>-></i></button>
+      </section>
+    </div>
+    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
     <script src="/socket.io/socket.io.js"></script>
+    <script src="game-data.js"></script>
     <script src="app.js"></script>
   </body>
 </html>

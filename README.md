@@ -1,26 +1,80 @@
-# Taptics
+# Taptics: Field Prototype
 
-A mobile-first real-time tapping strategy prototype. Choose whether each tap generates Energy, pulses enemy units, or repairs your defense—then use a compact deck to send a winning push and break the opposing Core.
+A mobile-first real-time strategy experiment where taps are a finite resource rather than an unlimited input. Matches continue until one core is destroyed and are balanced to resolve in roughly 2-4 minutes.
 
-## Play locally
+## Run locally
 
 ```bash
 npm install
 npm start
 ```
 
-Open `http://localhost:3000`. Choose **Battle CPU** for a solo match. Open the app in two browser windows and choose **Find Random Rival** in each to test live random matchmaking.
+Open `http://localhost:3000`. **Play CPU** starts an authoritative server-simulated training match. Open the app in two browser windows and choose **Find Rival** in both to test online matchmaking.
 
-## Prototype controls
+## Core loop
 
-- **Mine** taps give Energy to play cards. Tapping too quickly builds Heat and lowers mining output.
-- **Pulse** taps damage the closest incoming unit, or chip the enemy Core when their lane is clear.
-- **Build** taps repair your tower; without one, they build a short-lived Core shield.
-- Cards use Energy: Scout, Ram, Spark Swarm, Defense Tower, and Shield.
-- Destroy the opponent's 1,000-HP Core, or hold more Core health at the three-minute mark.
+- Players start with 10 of a maximum 40 taps.
+- Every loadout contains exactly six unique cards, with three cards visible in the battle hand.
+- Completing a card immediately replaces it with the next queued card and moves the completed card to the bottom of the cycle.
+- Partial tap progress stays attached to its card while that card remains in the hand.
+- Each loadout separately chooses **Cannon** or **Volley** as a permanent weapon that never enters the card cycle.
+- **Cannon** costs 8 taps, winds up for 1.4 seconds, and deals 50 base damage.
+- **Volley** costs 3 taps, resolves in 0.18 seconds, and deals 14 base damage.
+- Only the chosen permanent weapon appears on the battlefield. It occupies the left-side Attack zone.
+- Cards belong to **Attack**, **Crew**, or **Magic**. Each category has one commitment lane, so a second card in that category is disabled while another is unfinished or activating.
+- The permanent weapon shares the Attack lane with Attack cards. Crew commitments animate the villagers; Magic commitments animate the rune circle.
+- Constructed cards fill one of eight visible village structure tiles. A ninth structure cannot be built.
+- Destroying a wall salvages 4 taps for its owner, preserving a defensive decision after a breach.
+- Partial commitments, tap reserves, and action wind-ups are visible to both players.
 
-## Online play
+## Siphon counterplay
 
-The included Socket.IO server owns random matchmaking and game state, so live matches work wherever this Node app is hosted. Deploy with the `npm start` command (for example, on Render, Railway, or Fly.io); use a host that supports persistent WebSocket connections.
+Any unfinished rival commitment with at least one tap invested becomes a purple target on its Attack, Crew, or Magic zone. Tapping that zone spends from your own reserve and advances a three-hit siphon burst. The first three siphon taps remove one rival committed tap; the next three remove two more, preserving the intended rate of one removal for every two siphon taps while only cashing out complete three-hit bursts. Removed progress is transferred into your reserve.
 
-This is an intentionally compact prototype: no accounts, rating, persistence, anti-cheat hardening, card collection, or crate inventory are included yet.
+The three purple pips show the current burst. The rival progress bar visibly retreats when a burst lands. A siphon lock survives if the project is drained to zero and resumes if the rival invests again, but it is cleared when that action completes and enters its wind-up. Pending actions cannot be siphoned.
+
+## Prototype card set
+
+The 29-card prototype collection includes:
+
+- **Attack (6):** weapon amplifiers and direct pressure such as Piercing Shot, Siege Salvo, Suppressing Fire, and Execution Order.
+- **Crew (14):** workers, units, thieves, repairs, and structures including Tap Forge, Watchtower, Scout Camp, Pickpocket Crew, Sapper Team, and Mason Crew.
+- **Magic (9):** spells, wards, rituals, and counterplay including Phase Shield, Time Bomb, Arc Lightning, Gravity Well, Null Sigil, and Growth Rune.
+
+Costs range from 3 to 8 taps. Effects include persistent structures, passive regeneration, unit raids, direct tap theft, delayed burst damage, Wall-specific damage, wind-up disruption, weapon amplification, lane-safe stored progress, healing, shielding, and partial-action erasure.
+
+## Match phases
+
+1. **Fortify (0-25s):** damage is reduced by 25%; base regeneration is `+0.78 taps/sec`.
+2. **Clash (25-120s):** full damage; base regeneration is `+0.72 taps/sec`.
+3. **Overload (120s+):** damage progressively rises from 1.15x to 2.15x while Wall construction falls from 70% to 35% effectiveness. At 180 seconds, **Double Taps** doubles all passive, Tap Forge, and Glass Reactor tap generation for both players.
+
+There is no score timeout. Overload keeps raising offensive efficiency until a player destroys the opposing core.
+
+The CPU has several complete decks and strategic plans but follows the same hand size, queue order, tap reserve, input rate, card costs, siphon bursts, wind-ups, and information rules as a human player. Once it starts a siphon burst, it tries to finish all three taps before returning to its own build plan.
+
+## Engagement principles under test
+
+- Short complete matches with immediate rematch access
+- Visible opponent intent and counterplay instead of surprise outcomes
+- Mastery feedback based on reserve efficiency and sequencing
+- Varied CPU plans and optional self-imposed field tests
+- Close-game recovery through wall salvage rather than hidden rubber-banding
+- No paid power, forced timers, loot boxes, or penalties for leaving
+
+## Accessibility baseline
+
+- Body copy is set at 14-16px, with meaningful tactical labels kept at 12px or larger instead of the original 5-9px microtype.
+- Primary controls use at least 48px touch areas, exceeding the WCAG 2.2 AA 24px minimum and aligning with mobile platform guidance for comfortably tappable controls.
+- Browser zoom and text enlargement are not disabled. At very narrow effective widths, records, decks, cards, and phase information reflow instead of being clipped.
+- Keyboard focus uses a high-contrast visible outline, changing reserve guidance is announced as a live status, and reduced-motion preferences remain supported.
+
+The sizing pass follows the [WCAG guidance for text enlargement](https://www.w3.org/WAI/WCAG22/Understanding/resize-text), [WCAG target sizing](https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum), and [Apple accessibility guidance](https://developer.apple.com/design/human-interface-guidelines/accessibility).
+
+## Verify
+
+```bash
+npm test
+```
+
+The Socket.IO server owns matchmaking, deck validation, hand and queue order, tap validation, regeneration, card cycling, wind-ups, effects, damage, CPU decisions, and match results. Shared definitions live in `public/game-data.js` so the builder, client, and server use identical card data.
