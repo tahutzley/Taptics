@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
 const { io: connect } = require("socket.io-client");
-const { server, io, ticker, GAME_DATA, makeMatch, handleTap, handleSiphon, resolveCard, phaseAt, validateLoadout } = require("../server");
+const { server, io, ticker, GAME_DATA, makeMatch, handlePlaceCard, handleTap, handleSiphon, resolveCard, phaseAt, validateLoadout } = require("../server");
 
 function once(socket, event) { return new Promise(resolve => socket.once(event, resolve)); }
 function stateMatching(socket, predicate, timeout = 1800) {
@@ -42,20 +42,38 @@ test("client keeps zoom and changing battle guidance accessible", () => {
   assert.doesNotMatch(html, /user-scalable\s*=\s*no/i);
   assert.match(html, /id="reserve-hint" role="status" aria-live="polite"/);
   assert.match(html, /id="toast" class="toast hidden" role="status" aria-live="polite"/);
+  assert.match(html, /id="card-inspector" class="card-inspector hidden" role="tooltip"/);
   assert.match(html, /id="own-weapon"/);
   assert.match(html, /id="own-crew"/);
   assert.match(html, /id="own-magic"/);
   assert.doesNotMatch(html, /id="own-(?:cannon|volley)"/);
-  assert.match(html, /class="base own-base"[\s\S]*id="commit-button" class="lane-commit/);
+  assert.match(html, /id="own-action-attack" class="lane-commit queued-action target-attack/);
+  assert.match(html, /id="own-action-crew" class="lane-commit queued-action target-crew/);
+  assert.match(html, /id="own-action-magic" class="lane-commit queued-action target-magic/);
+  assert.match(html, /FOUR-CARD HAND/);
+  assert.doesNotMatch(html, /id="commit-button"/);
   assert.doesNotMatch(html, /class="(?:commit-note|own-status)"|id="own-(?:core-value|core-bar|wall-footer)"/);
   assert.match(client, /hand\.dataset\.signature !== handSignature/);
-  assert.match(client, /#battle-hand"\)\.addEventListener\("pointerdown", selectHandCard\)/);
+  assert.match(client, /function showCardInspector\(source, key, anchor\)/);
+  assert.match(client, /function inspectCardContext\(event, element, source, key\)/);
+  assert.match(client, /inspectedElement === element && !\$\("#card-inspector"\)\.classList\.contains\("hidden"\)/);
+  assert.match(client, /#battle-hand"\)\.addEventListener\("pointerdown", placeHandCard\)/);
+  assert.match(client, /#battle-hand"\)\.addEventListener\("contextmenu"/);
+  assert.match(client, /type: "place", key, slot/);
   assert.match(client, /data-busy-label="\$\{category\.name\.toUpperCase\(\)\} IS BUSY"/);
-  assert.match(client, /button\.className = `lane-commit target-\$\{categoryKey\}/);
-  assert.match(client, /#commit-button"\)\.addEventListener\("click", activateCommit\)/);
-  assert.match(client, /#commit-button"\)\.addEventListener\("keydown", activateCommitKey\)/);
+  assert.match(client, /renderQueuedAction\(prefix, player, category\)/);
+  assert.match(client, /action\.addEventListener\("click", activateCommit\)/);
+  assert.match(client, /action\.addEventListener\("keydown", activateCommitKey\)/);
+  assert.match(client, /action\.addEventListener\("contextmenu"/);
   assert.doesNotMatch(battleCardRenderer, /card\.type\.toUpperCase\(\)/);
   assert.doesNotMatch(client, /data-hand-slot[^\n]+addEventListener/);
+});
+
+test("every battle definition has concise right-click inspector stats", () => {
+  assert.deepEqual(Object.keys(GAME_DATA.cardStats).sort(), Object.keys(GAME_DATA.cards).sort());
+  assert.deepEqual(Object.keys(GAME_DATA.weaponStats).sort(), Object.keys(GAME_DATA.weapons).sort());
+  assert.ok(Object.values(GAME_DATA.cardStats).every(stats => stats.length > 0 && stats.every(stat => typeof stat === "string" && stat.length <= 31)));
+  assert.ok(Object.values(GAME_DATA.weaponStats).every(stats => stats.length > 0));
 });
 
 test("validates six unique cards and cycles a completed card to the bottom", () => {
@@ -63,12 +81,36 @@ test("validates six unique cards and cycles a completed card to the bottom", () 
   assert.deepEqual(validateLoadout({ deck, weapon: "volley" }), { deck, weapon: "volley" });
   const match = makeMatch("cycle-one", "cycle-two", { firstLoadout: { deck, weapon: "volley" } });
   const started = Date.now();
+  assert.equal(handlePlaceCard(match, 1, { key: "emergencyCache", slot: 0 }), true);
+  assert.deepEqual(match.players[1].hand, [null, "rampart", "saboteur", "timeBomb"]);
   for (let index = 0; index < GAME_DATA.cards.emergencyCache.cost; index++) {
     assert.equal(handleTap(match, 1, { source: "card", key: "emergencyCache" }, started + index * 100), true);
   }
-  assert.deepEqual(match.players[1].hand, ["timeBomb", "rampart", "saboteur"]);
+  assert.deepEqual(match.players[1].hand, ["echoRelay", "rampart", "saboteur", "timeBomb"]);
   assert.equal(match.players[1].queue.at(-1), "emergencyCache");
+  assert.equal(match.players[1].placed.crew, null);
   assert.ok(match.players[1].pending.some(job => job.key === "emergencyCache"));
+});
+
+test("placing reserves a hand slot and untouched same-category cards can swap", () => {
+  const deck = ["phaseShield", "timeBomb", "arcLightning", "tapForge", "piercingShot", "rampart"];
+  const match = makeMatch("place-one", "place-two", { firstLoadout: { deck, weapon: "cannon" } });
+  const player = match.players[1];
+  const started = Date.now();
+  assert.equal(handlePlaceCard(match, 1, { key: "phaseShield", slot: 0 }), true);
+  assert.deepEqual(player.placed.magic, { key: "phaseShield", slot: 0 });
+  assert.equal(player.hand[0], null);
+  assert.equal(handlePlaceCard(match, 1, { key: "timeBomb", slot: 1 }), true);
+  assert.equal(player.hand[0], "phaseShield");
+  assert.equal(player.hand[1], null);
+  assert.deepEqual(player.placed.magic, { key: "timeBomb", slot: 1 });
+  assert.equal(handleTap(match, 1, { source: "card", key: "timeBomb" }, started), true);
+  assert.equal(handlePlaceCard(match, 1, { key: "phaseShield", slot: 0 }), false, "the first committed tap locks Magic");
+  for (let index = 0; index < 3; index++) assert.equal(handleSiphon(match, 2, { source: "card", key: "timeBomb" }, started + index * 100), true);
+  assert.equal(player.cardProgress.timeBomb, 0);
+  assert.equal(handlePlaceCard(match, 1, { key: "phaseShield", slot: 0 }), true, "counterplay returning progress to zero unlocks swapping");
+  assert.deepEqual(player.placed.magic, { key: "phaseShield", slot: 0 });
+  assert.equal(player.hand[1], "timeBomb");
 });
 
 test("siphon bursts steal active progress at the two-for-one rate", () => {
@@ -85,23 +127,24 @@ test("siphon bursts steal active progress at the two-for-one rate", () => {
   assert.deepEqual(match.players[1].siphons["weapon:cannon"], { totalTaps: 6, processedPairs: 3, removed: 3 });
 });
 
-test("one unfinished action owns its category lane until completion or counterplay", () => {
-  const deck = ["phaseShield", "timeBomb", "arcLightning", "tapForge", "piercingShot", "rampart"];
-  const match = makeMatch("lane-one", "lane-two", { firstLoadout: { deck, weapon: "cannon" } });
-  const started = Date.now();
-  assert.equal(handleTap(match, 1, { source: "card", key: "phaseShield" }, started), true);
-  assert.equal(handleTap(match, 1, { source: "card", key: "timeBomb" }, started + 100), false, "a second Magic card is locked");
-  for (let index = 0; index < 3; index++) assert.equal(handleSiphon(match, 2, { source: "card", key: "phaseShield" }, started + index * 100), true);
-  assert.equal(match.players[1].cardProgress.phaseShield, 0);
-  assert.equal(handleTap(match, 1, { source: "card", key: "timeBomb" }, started + 400), true, "draining the first spell releases Magic");
-});
-
 test("the permanent weapon and Attack cards share one visible lane", () => {
   const deck = ["piercingShot", "rampart", "phaseShield", "tapForge", "timeBomb", "echoRelay"];
   const match = makeMatch("attack-one", "attack-two", { firstLoadout: { deck, weapon: "volley" } });
   const started = Date.now();
+  assert.equal(handlePlaceCard(match, 1, { key: "piercingShot", slot: 0 }), true);
   assert.equal(handleTap(match, 1, { source: "weapon" }, started), true);
   assert.equal(handleTap(match, 1, { source: "card", key: "piercingShot" }, started + 100), false);
+});
+
+test("breaking a Wall never changes the defender's tap reserve", () => {
+  const match = makeMatch("wall-one", "wall-two");
+  match.players[2].wallHp = 1;
+  match.players[2].taps = 6.25;
+  resolveCard(match, 1, "piercingShot", Date.now());
+  assert.equal(match.players[2].wallHp, 0);
+  assert.equal(match.players[2].taps, 6.25);
+  assert.equal(match.lastEvent.type, "wallBreak");
+  assert.equal(match.lastEvent.salvage, undefined);
 });
 
 test("structures occupy a maximum of eight visible village tiles", () => {
@@ -141,8 +184,15 @@ test("pairs online players and shares tap commitments", async () => {
   assert.equal(state.players[1].weaponProgress, 1);
   assert.equal(GAME_DATA.weapons.cannon.cost, 8);
   assert.equal(state.players[1].deck.length, 6);
-  assert.equal(state.players[1].hand.length, 3);
+  assert.equal(state.players[1].hand.length, 4);
+  assert.deepEqual(state.players[1].placed, { attack: null, crew: null, magic: null });
   assert.equal(state.timeLeft, undefined, "elimination matches should not have a score timeout");
+
+  const placed = stateMatching(observer, next => next.players[1].placed.crew?.key === "rampart");
+  playerOneSocket.emit("action", { type: "place", key: "rampart", slot: 0 });
+  const placedState = await placed;
+  assert.equal(placedState.players[1].hand[0], null);
+  assert.deepEqual(placedState.players[1].placed.crew, { key: "rampart", slot: 0 });
 
   first.close();
   second.close();
@@ -163,5 +213,6 @@ test("CPU uses the same visible resource model", async () => {
   const botActed = await stateMatching(player, state => state.players[2].stats.tapsSpent > 0, 2500);
   assert.ok(botActed.players[2].taps < 10.5);
   assert.ok(botActed.players[2].weaponProgress > 0 || Object.values(botActed.players[2].cardProgress).some(value => value > 0));
+  assert.ok(botActed.players[2].placed.attack || botActed.players[2].placed.crew || botActed.players[2].placed.magic || botActed.players[2].weaponProgress > 0);
   player.close();
 });

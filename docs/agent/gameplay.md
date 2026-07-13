@@ -22,9 +22,10 @@ Double Taps multiplies passive, Forge, Reactor, and Scout Camp generation; it do
 ## Loadout and cycle
 
 - A loadout is exactly six unique known cards and one permanent Cannon or Volley.
-- Three cards are visible. The remaining three form an ordered queue.
-- Progress belongs to the card key while that card remains in hand.
-- When a card receives its final required tap, its progress clears, it becomes a pending wind-up, the next queued card replaces its hand slot immediately, and the completed card moves to the queue bottom.
+- Four cards are visible. The remaining two form an ordered queue.
+- A card must first be placed into its category. Placement removes it from the hand, records `{ key, slot }`, leaves that slot blank, and spends no tap.
+- One card may be staged in each category simultaneously. Before its first tap, it can be swapped for another same-category hand card; the old card returns to its original slot and the new card reserves its own slot.
+- Progress belongs to the staged card key. When it receives its final tap, progress clears, it becomes a pending wind-up, the next queued card fills its reserved slot immediately, and the completed card moves to the queue bottom.
 - The permanent weapon never enters the deck cycle and cannot store progress after it completes.
 
 Permanent weapons:
@@ -36,12 +37,12 @@ Permanent weapons:
 
 ## Commitment lanes
 
-Every card belongs to Attack, Crew, or Magic. Each category permits one unfinished or pending commitment at a time.
+Every card belongs to Attack, Crew, or Magic. Each category permits one staged card and one active commitment state.
 
 - Attack includes the permanent weapon and Attack cards; they lock each other.
 - Crew covers villagers, raids, repairs, Wall work, and most structures.
 - Magic covers spells, wards, rituals, and unusual rule manipulation.
-- A lane releases after its job resolves, or when opponent counterplay drains unfinished progress to zero.
+- Mere zero-progress staging does not lock a lane. A lane locks after its first tap, releases after its job resolves, or becomes swappable again when counterplay drains unfinished progress to zero.
 - Different categories can be developed concurrently.
 
 Both client and server mirror the rule for feedback, but `laneAvailable()` on the server is authoritative.
@@ -65,7 +66,8 @@ Damage is applied Shield -> Wall -> core unless an effect is Wall-only. Core dam
 - Normal Wall cap: 80 HP.
 - Bulwark temporarily raises the cap to 100 HP; excess decays after the effect expires.
 - Shield cap: 90 HP.
-- A Wall breach refunds 4 taps to its owner plus any Salvage Guild bonus.
+- A Wall breach changes no tap reserve or regeneration value.
+- Supply Guild (the `salvageGuild` data key) supplies steady `+0.10 taps/sec` per built copy instead of breach salvage.
 - Overload increases damage while progressively weakening new Wall construction to prevent indefinite defense.
 
 ## Structures and catalogue
@@ -86,4 +88,4 @@ The current catalogue contains 29 cards: 6 Attack, 14 Crew, and 9 Magic. Costs, 
 - Keep defense useful without enabling permanent stalemates.
 - Telegraph high-impact commitments long enough for siphon counterplay.
 - Price refunds, generation, healing, and theft against both their tap cost and deck-cycle value.
-- Test pacing through full matches; isolated damage-per-tap calculations miss lane locks, wind-ups, Wall salvage, and cycle opportunity cost.
+- Test pacing through full matches; isolated damage-per-tap calculations miss staging, lane locks, wind-ups, and cycle opportunity cost.

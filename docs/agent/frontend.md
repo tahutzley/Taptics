@@ -4,9 +4,9 @@ The browser client is mobile-first, dependency-free HTML/CSS/JavaScript. It rend
 
 ## Screens and ownership
 
-- Lobby: profile record, matchmaking, saved six-card cycle, weapon, field challenge, and phase explanation.
-- Battle: enemy village, shared field, own village, compact reserve, three-card hand, permanent weapon, and a selected action target positioned directly over its battlefield category.
-- Deck modal: choose exactly six unique cards and one permanent weapon.
+- Lobby: battle-first rating home, online and CPU matchmaking, compact record/challenge/loadout cards, and persistent Battle/Deck/Challenges navigation shared with the Deck screen. The displayed ELO is a local progression score derived from the saved win/loss record, not an authoritative matchmaking rating. Challenges remains visibly disabled until that menu surface is implemented.
+- Battle: enemy village, shared field, own village, compact reserve, four-card hand, permanent weapon, and up to three staged card targets positioned over their battlefield categories.
+- Deck screen: a full lobby-level screen for choosing exactly six unique cards and one permanent weapon. Battle and Deck are switched exclusively through the persistent bottom navigation; there is no deck back control. Save Loadout stays on the Deck screen and remains above the long card library.
 - Result modal: outcome, performance stats, tactical read, rematch, and lobby return.
 
 `showLobby()` and `showGame()` own screen transitions. `render(state)` maps snapshots to the battle. Keep expensive or focus-disrupting DOM replacement out of the 100ms state path.
@@ -26,24 +26,27 @@ The arena is the dominant battle surface. Core and Wall values live on their bat
 
 `renderProjectCues()` applies normalized loading, pending, and siphon states to the three category zones. Rival intent should be legible from animation, fill, glow, pending state, and counterability; explanatory text may support accessibility but should not become the primary visual signal.
 
-## Selection and input contract
+## Deployment and input contract
 
 The hand-selection bug is guarded by a specific architecture:
 
 - `#battle-hand` owns delegated listeners; rendered card buttons do not own listeners.
-- `renderBattleHand()` computes a hand signature. It rebuilds hand markup only when card keys/order change, then updates selected, pending, disabled, and progress states in place on ordinary snapshots.
-- `pointerdown` selects immediately on touch/mouse. A `click` listener handles keyboard and assistive activation only; mouse-generated clicks are filtered with `event.detail` to avoid duplicate selection.
-- The permanent weapon uses the same paired input approach.
-- Selecting a card moves `#commit-button` over its own Attack, Crew, or Magic zone. The overlay adopts that card's icon, name, color, cost, and progress; tapping this battlefield element spends on the selected target. Selecting a card never spends a tap.
-- Lane-disabled cards use both native `disabled` and `aria-disabled`. Selection state must stay visually distinct from disabled/pending state.
+- `renderBattleHand()` computes a hand signature. It rebuilds hand markup only when card keys/order change. A `null` slot renders as a noninteractive outlined placeholder until that deployed card completes.
+- Primary `pointerdown` immediately performs the normal deploy, tap, or siphon. Right-click/`contextmenu` reveals the stat inspector without performing the action; right-clicking the same card again, the next left click, or Escape closes it. Right-clicking a different card switches the inspector directly.
+- `click` and explicit keyboard handling cover assistive, Enter, and Space activation without duplicating primary-pointer input. Every pointer action must reject non-primary buttons so right-click can never spend a tap or move a card.
+- Deploying emits authoritative `action:place`, spends no tap, and animates a visual clone from the hand to `#own-action-attack`, `#own-action-crew`, or `#own-action-magic`.
+- `renderQueuedAction()` shows the staged or pending card independently in every category for both players, including its exact `progress/cost` value. These six solid controls are direct children of their `.base`, use `target-attack/crew/magic` positioning, and must not be nested inside decorative zone art where clipping or stacking can make them disappear.
+- An untouched staged card may swap with a same-category hand card. Once progress or wind-up occupies the category, related hand cards and the conflicting permanent weapon use native `disabled` plus a readable busy label.
+- The permanent weapon is tapped directly from its persistent card and shares the authoritative Attack lock.
 - Battle cards show category through color rather than repeated category/type copy. A blocked card receives a high-contrast `ATTACK/CREW/MAGIC IS BUSY` label over the card.
+- Right-click inspector numbers come from `cardStats` and `weaponStats` in `game-data.js`. Keep those concise arrays complete whenever definitions are added or balance values change.
 
 Do not call `renderBattleHand()` in a way that replaces the button under an active pointer unless the actual hand cycled. Do not attach listeners inside `cardButton()` or after every state snapshot.
 
 ## State and data
 
 - `window.GAME_DATA` supplies all definitions.
-- `selectedTarget` is `{ source: "weapon" }` or `{ source: "card", slot }`; resolve the current card key from the live hand before emitting.
+- `players[*].placed` maps each category to `null` or `{ key, slot }`. Treat it as server-owned staging state and never infer deployment only from the DOM.
 - `matchState` is replaceable snapshot state; do not mutate it to simulate authoritative outcomes.
 - Local storage key `taptics-prototype-v3` contains profile, deck, weapon, and challenge progress. Be deliberate about migrations if its shape changes.
 - `lastEventId` prevents replaying transient effects from repeated snapshots.

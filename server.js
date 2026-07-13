@@ -44,9 +44,10 @@ function makePlayer(id, isBot = false, loadout = {}) {
   return {
     id, isBot, coreHp: STARTING_CORE, wallHp: STARTING_WALL, shield: 0, taps: 10,
     deck: [...valid.deck], hand: valid.deck.slice(0, GAME_DATA.handSize), queue: valid.deck.slice(GAME_DATA.handSize),
+    placed: { attack: null, crew: null, magic: null },
     cardProgress: Object.fromEntries(valid.deck.map(key => [key, 0])), weapon: valid.weapon, weaponProgress: 0,
     pending: [], nextTapAt: 0, structures: [], forges: 0, glassReactors: 0, scoutCamps: 0, watchtowers: 0, growthRunes: 0,
-    weaponBoost: 1, salvageBonus: 0,
+    weaponBoost: 1, guilds: 0,
     jammedUntil: 0, bulwarkUntil: 0, siphons: {},
     stats: { tapsSpent: 0, damage: 0, capWaste: 0, wallsBuilt: 0, structuresBuilt: 0, cannons: 0, volleys: 0, wallBreaks: 0, cardsPlayed: 0, siphonTaps: 0, stolenTaps: 0 },
     bot: null
@@ -71,9 +72,10 @@ function publicPlayer(player) {
     coreHp: Math.round(player.coreHp * 10) / 10, wallHp: Math.round(player.wallHp * 10) / 10,
     shield: Math.round(player.shield * 10) / 10, taps: Math.round(player.taps * 10) / 10,
     deck: [...player.deck], hand: [...player.hand], nextCard: player.queue[0], cardProgress: { ...player.cardProgress },
+    placed: Object.fromEntries(Object.entries(player.placed).map(([category, entry]) => [category, entry ? { ...entry } : null])),
     weapon: player.weapon, weaponProgress: player.weaponProgress, structures: [...player.structures],
     forges: player.forges, glassReactors: player.glassReactors, scoutCamps: player.scoutCamps, watchtowers: player.watchtowers, growthRunes: player.growthRunes,
-    weaponBoost: player.weaponBoost, salvageBonus: player.salvageBonus, wallCap: currentWallCap(player),
+    weaponBoost: player.weaponBoost, guilds: player.guilds, wallCap: currentWallCap(player),
     siphons: Object.fromEntries(Object.entries(player.siphons).map(([key, lock]) => [key, { totalTaps: lock.totalTaps, burst: lock.totalTaps % 3, removed: lock.removed }])),
     pending: player.pending.map(job => ({ id: job.id, source: job.source, key: job.key, resolveAt: job.resolveAt })),
     stats: { ...player.stats }, bot: player.bot ? { key: player.bot.key, name: player.bot.name, label: player.bot.label } : null
@@ -128,19 +130,20 @@ function dealDamage(match, side, amount, source, options = {}) {
   const total = shieldDamage + wallDamage + coreDamage;
   attacker.stats.damage += total;
   if (beforeWall > 0 && target.wallHp <= 0) {
-    const salvage = 4 + target.salvageBonus;
-    target.taps = Math.min(MAX_TAPS, target.taps + salvage);
     target.stats.wallBreaks++;
-    addEvent(match, "wallBreak", side, { source, amount: total, salvageSide: targetSide, salvage });
+    addEvent(match, "wallBreak", side, { source, amount: total, targetSide });
   } else addEvent(match, "hit", side, { source, amount: total, target: shieldDamage ? "shield" : wallDamage ? "wall" : "core" });
   return total;
 }
-function cycleCard(player, key) {
-  const index = player.hand.indexOf(key);
-  if (index < 0) return;
+function cyclePlacedCard(player, key) {
+  const category = GAME_DATA.cards[key]?.category;
+  const entry = category && player.placed[category];
+  if (!entry || entry.key !== key) return false;
   const next = player.queue.shift();
-  player.hand[index] = next;
+  player.hand[entry.slot] = next;
   player.queue.push(key);
+  player.placed[category] = null;
+  return true;
 }
 function clearSiphonLock(match, targetSide, source, key) {
   const attacker = match.players[opponent(targetSide)];
@@ -183,13 +186,13 @@ function resolveCard(match, side, key, now) {
   if (key === "echoRelay") {
     for (const category of Object.keys(GAME_DATA.categories)) {
       if (laneOccupant(player, category)) continue;
-      const handKey = player.hand.find(cardKey => GAME_DATA.cards[cardKey].category === category);
-      if (handKey) player.cardProgress[handKey] = Math.min(GAME_DATA.cards[handKey].cost - 1, (player.cardProgress[handKey] || 0) + 2);
+      const placedKey = player.placed[category]?.key;
+      if (placedKey) player.cardProgress[placedKey] = Math.min(GAME_DATA.cards[placedKey].cost - 1, (player.cardProgress[placedKey] || 0) + 2);
     }
   }
   if (key === "salvageGuild") {
-    if (buildStructure(player, key, 3)) player.salvageBonus += 2;
-    else player.taps = Math.min(MAX_TAPS, player.taps + 4);
+    if (buildStructure(player, key, 3)) player.guilds++;
+    else player.wallHp = Math.min(currentWallCap(player, now), player.wallHp + 12 * phase.wallPower);
   }
   if (key === "piercingShot") dealDamage(match, side, 30 * phase.damage, key);
   if (key === "siegeSalvo") dealDamage(match, side, (enemy.wallHp > 0 ? 48 : 28) * phase.damage, key, { wallOnly: enemy.wallHp > 0 });
@@ -217,7 +220,7 @@ function resolveCard(match, side, key, now) {
   if (key === "nullSigil") {
     const targets = [
       { source: "weapon", key: enemy.weapon, progress: enemy.weaponProgress, cost: GAME_DATA.weapons[enemy.weapon].cost },
-      ...enemy.hand.map(cardKey => ({ source: "card", key: cardKey, progress: enemy.cardProgress[cardKey] || 0, cost: GAME_DATA.cards[cardKey].cost }))
+      ...Object.values(enemy.placed).filter(Boolean).map(entry => ({ source: "card", key: entry.key, progress: enemy.cardProgress[entry.key] || 0, cost: GAME_DATA.cards[entry.key].cost }))
     ].filter(target => target.progress > 0).sort((a, b) => b.progress / b.cost - a.progress / a.cost);
     const target = targets[0];
     if (target) {
@@ -253,10 +256,31 @@ function laneOccupant(player, category) {
   if (category === "attack") {
     if (player.weaponProgress > 0 || hasPending(player, "weapon", player.weapon)) return { source: "weapon", key: player.weapon };
   }
-  const partial = player.hand.find(key => GAME_DATA.cards[key].category === category && (player.cardProgress[key] || 0) > 0);
-  if (partial) return { source: "card", key: partial };
+  const placed = player.placed[category];
+  if (placed && (player.cardProgress[placed.key] || 0) > 0) return { source: "card", key: placed.key };
   const pending = player.pending.find(job => job.source === "card" && GAME_DATA.cards[job.key]?.category === category);
   return pending ? { source: "card", key: pending.key } : null;
+}
+function canPlaceCard(player, key, slot = player.hand.indexOf(key)) {
+  const card = GAME_DATA.cards[key];
+  if (!card || slot < 0 || player.hand[slot] !== key) return false;
+  const active = laneOccupant(player, card.category);
+  if (active) return false;
+  const existing = player.placed[card.category];
+  return !existing || ((player.cardProgress[existing.key] || 0) === 0 && !hasPending(player, "card", existing.key));
+}
+function handlePlaceCard(match, side, target = {}) {
+  const player = match.players[side];
+  const slot = Number(target.slot);
+  const key = target.key;
+  if (!player || match.ended || !Number.isInteger(slot) || !canPlaceCard(player, key, slot)) return false;
+  const category = GAME_DATA.cards[key].category;
+  const existing = player.placed[category];
+  if (existing) player.hand[existing.slot] = existing.key;
+  player.hand[slot] = null;
+  player.placed[category] = { key, slot };
+  addEvent(match, "place", side, { key, category, slot, replaced: existing?.key || null });
+  return true;
 }
 function laneAvailable(player, source, key) {
   const category = source === "weapon" ? "attack" : GAME_DATA.cards[key]?.category;
@@ -270,7 +294,7 @@ function handleTap(match, side, target = {}, now = Date.now()) {
   const key = source === "weapon" ? player.weapon : target.key;
   const definition = source === "weapon" ? GAME_DATA.weapons[key] : GAME_DATA.cards[key];
   if (!definition || hasPending(player, source, key)) return false;
-  if (source === "card" && !player.hand.includes(key)) return false;
+  if (source === "card" && player.placed[definition.category]?.key !== key) return false;
   if (!laneAvailable(player, source, key)) return false;
 
   player.nextTapAt = now + TAP_COOLDOWN_MS;
@@ -281,7 +305,7 @@ function handleTap(match, side, target = {}, now = Date.now()) {
   const progress = source === "weapon" ? player.weaponProgress : player.cardProgress[key];
   if (progress >= definition.cost) {
     if (source === "weapon") player.weaponProgress = 0;
-    else { player.cardProgress[key] = 0; cycleCard(player, key); player.stats.cardsPlayed++; }
+    else { player.cardProgress[key] = 0; cyclePlacedCard(player, key); player.stats.cardsPlayed++; }
     clearSiphonLock(match, side, source, key);
     const job = { id: ++match.jobId, source, key, resolveAt: now + definition.windup };
     player.pending.push(job);
@@ -297,7 +321,7 @@ function handleSiphon(match, side, target = {}, now = Date.now()) {
   const source = target.source === "card" ? "card" : "weapon";
   const key = source === "weapon" ? defender.weapon : target.key;
   if (source === "weapon" && target.key && target.key !== defender.weapon) return false;
-  if (source === "card" && (!GAME_DATA.cards[key] || !defender.hand.includes(key))) return false;
+  if (source === "card" && (!GAME_DATA.cards[key] || defender.placed[GAME_DATA.cards[key].category]?.key !== key)) return false;
   if (hasPending(defender, source, key)) return false;
   const progress = source === "weapon" ? defender.weaponProgress : defender.cardProgress[key] || 0;
   if (progress <= 0) return false;
@@ -330,19 +354,22 @@ function handleSiphon(match, side, target = {}, now = Date.now()) {
 function validBotTarget(player, target) {
   if (!target) return false;
   if (target.source === "weapon") return !hasPending(player, "weapon", player.weapon) && laneAvailable(player, "weapon", player.weapon);
-  return player.hand.includes(target.key) && !hasPending(player, "card", target.key) && laneAvailable(player, "card", target.key);
+  const card = GAME_DATA.cards[target.key];
+  return Boolean(card && player.placed[card.category]?.key === target.key && !hasPending(player, "card", target.key) && laneAvailable(player, "card", target.key));
 }
 function validSiphonTarget(player, target) {
   if (!target) return false;
   if (target.source === "weapon") return player.weapon === target.key && player.weaponProgress > 0 && !hasPending(player, "weapon", target.key);
-  return player.hand.includes(target.key) && (player.cardProgress[target.key] || 0) > 0 && !hasPending(player, "card", target.key);
+  const card = GAME_DATA.cards[target.key];
+  return Boolean(card && player.placed[card.category]?.key === target.key && (player.cardProgress[target.key] || 0) > 0 && !hasPending(player, "card", target.key));
 }
 function chooseBotSiphonTarget(bot, rival) {
   const candidates = [];
   if (rival.weaponProgress > 0 && !hasPending(rival, "weapon", rival.weapon)) {
     candidates.push({ source: "weapon", key: rival.weapon, progress: rival.weaponProgress / GAME_DATA.weapons[rival.weapon].cost });
   }
-  for (const key of rival.hand) {
+  for (const entry of Object.values(rival.placed).filter(Boolean)) {
+    const key = entry.key;
     if ((rival.cardProgress[key] || 0) > 0 && !hasPending(rival, "card", key)) candidates.push({ source: "card", key, progress: rival.cardProgress[key] / GAME_DATA.cards[key].cost });
   }
   candidates.sort((a, b) => {
@@ -356,11 +383,11 @@ function chooseBotTarget(match) {
   const bot = match.players[2];
   const rival = match.players[1];
   const elapsed = (Date.now() - match.startedAt) / 1000;
-  const inHand = (...keys) => keys.find(key => bot.hand.includes(key) && !hasPending(bot, "card", key) && laneAvailable(bot, "card", key));
+  const inHand = (...keys) => keys.find(key => bot.hand.includes(key) && canPlaceCard(bot, key));
   const threatened = rival.pending.some(job => job.source === "weapon" || job.key === "timeBomb");
   const defensive = inHand("phaseShield", "rampart", "bulwark");
   if ((threatened || bot.wallHp < 28) && defensive) return { source: "card", key: defensive };
-  const partialCard = bot.hand.find(key => (bot.cardProgress[key] || 0) > 0 && !hasPending(bot, "card", key));
+  const partialCard = Object.values(bot.placed).filter(Boolean).map(entry => entry.key).find(key => (bot.cardProgress[key] || 0) > 0 && !hasPending(bot, "card", key));
   if (partialCard) return { source: "card", key: partialCard };
   if (bot.weaponProgress > 0 && !hasPending(bot, "weapon", bot.weapon)) return { source: "weapon", key: bot.weapon };
   if (bot.coreHp < 250 && inHand("repairDrone")) return { source: "card", key: "repairDrone" };
@@ -371,7 +398,7 @@ function chooseBotTarget(match) {
   if (attack && bot.taps > GAME_DATA.cards[attack].cost + 2) return { source: "card", key: attack };
   if (inHand("echoRelay", "salvageGuild") && Math.random() < .2) return { source: "card", key: inHand("echoRelay", "salvageGuild") };
   if (laneAvailable(bot, "weapon", bot.weapon)) return { source: "weapon", key: bot.weapon };
-  const fallback = bot.hand.find(key => laneAvailable(bot, "card", key) && !hasPending(bot, "card", key));
+  const fallback = bot.hand.find(key => key && canPlaceCard(bot, key));
   return fallback ? { source: "card", key: fallback } : null;
 }
 function tickBot(match, now) {
@@ -389,6 +416,11 @@ function tickBot(match, now) {
     return;
   }
   if (!validBotTarget(bot, bot.bot.target)) bot.bot.target = chooseBotTarget(match);
+  if (bot.bot.target?.source === "card" && bot.hand.includes(bot.bot.target.key)) {
+    handlePlaceCard(match, 2, { key: bot.bot.target.key, slot: bot.hand.indexOf(bot.bot.target.key) });
+    bot.bot.nextDecisionAt = now + randomBetween([110, 180]);
+    return;
+  }
   if (bot.bot.target && !handleTap(match, 2, bot.bot.target, now)) bot.bot.target = chooseBotTarget(match);
   if (!validBotTarget(bot, bot.bot.target)) bot.bot.target = null;
   bot.bot.nextDecisionAt = now + randomBetween(bot.bot.pace);
@@ -402,7 +434,7 @@ function tickMatch(match) {
   const phase = phaseAt(elapsed);
   for (const side of [1, 2]) {
     const player = match.players[side];
-    let regen = (phase.regen + player.forges * .2 + player.glassReactors * .28 + player.scoutCamps * .12) * phase.tapMultiplier;
+    let regen = (phase.regen + player.forges * .2 + player.glassReactors * .28 + player.scoutCamps * .12 + player.guilds * .1) * phase.tapMultiplier;
     if (now < player.jammedUntil) regen *= .5;
     if (player.taps >= MAX_TAPS - .01) player.stats.capWaste += delta;
     player.taps = Math.min(MAX_TAPS, player.taps + regen * delta);
@@ -443,9 +475,10 @@ io.on("connection", socket => {
     broadcast(match);
   });
   socket.on("cancelSearch", () => { removeFromQueue(socket.id); socket.emit("queueStatus", { searching: false }); });
-  socket.on("action", ({ type, source, key } = {}) => {
+  socket.on("action", ({ type, source, key, slot } = {}) => {
     const match = matches.get(socket.data.matchId);
     if (!match || !socket.data.side) return;
+    if (type === "place" && handlePlaceCard(match, socket.data.side, { key, slot })) broadcast(match);
     if (type === "tap" && handleTap(match, socket.data.side, { source, key })) broadcast(match);
     if (type === "siphon" && handleSiphon(match, socket.data.side, { source, key })) broadcast(match);
   });
@@ -458,4 +491,4 @@ io.on("connection", socket => {
 });
 
 if (require.main === module) server.listen(PORT, () => console.log(`Taptics running on http://localhost:${PORT}`));
-module.exports = { server, io, ticker, GAME_DATA, makeMatch, handleTap, handleSiphon, resolveCard, tickMatch, phaseAt, validateLoadout };
+module.exports = { server, io, ticker, GAME_DATA, makeMatch, handlePlaceCard, handleTap, handleSiphon, resolveCard, tickMatch, phaseAt, validateLoadout };

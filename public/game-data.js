@@ -26,7 +26,7 @@
       overclock: { name: "Overclock", short: "OC", cost: 5, windup: 450, type: "tactic", category: "attack", color: "#ffb347", description: "Prepare an attack lane boost: your next weapon deals 60% more damage." },
       berserker: { name: "Berserker Protocol", short: "BP", cost: 4, windup: 250, type: "tactic", category: "attack", color: "#ff4f4f", description: "Next weapon deals 35% more damage, but your core immediately loses 12 HP." },
       echoRelay: { name: "Echo Relay", short: "ER", cost: 6, windup: 1000, type: "rune", category: "magic", color: "#59e0d0", description: "Store 2 taps in one available card from each commitment lane." },
-      salvageGuild: { name: "Salvage Guild", short: "SG", cost: 5, windup: 1000, type: "structure", category: "crew", structure: true, color: "#d5ad67", description: "Build a Guild: Wall breaches salvage 2 additional taps. Maximum three." },
+      salvageGuild: { name: "Supply Guild", short: "SG", cost: 5, windup: 1000, type: "structure", category: "crew", structure: true, color: "#d5ad67", description: "Build a Guild: steady +0.10 taps/sec logistics. Maximum three." },
 
       piercingShot: { name: "Piercing Shot", short: "PI", cost: 5, windup: 550, type: "strike", category: "attack", color: "#ffb16c", description: "Fire a prepared strike for 30 damage. Reliable, fast attack-lane pressure." },
       siegeSalvo: { name: "Siege Salvo", short: "SS", cost: 6, windup: 1100, type: "siege", category: "attack", color: "#ff775d", description: "Deal 48 damage to a Wall, or 28 damage when no Wall remains." },
@@ -43,9 +43,44 @@
       nullSigil: { name: "Null Sigil", short: "NS", cost: 6, windup: 450, type: "counterspell", category: "magic", color: "#d5a3ff", description: "Erase up to 3 taps from the rival's most-developed unfinished action." },
       growthRune: { name: "Growth Rune", short: "GR+", cost: 5, windup: 1000, type: "structure", category: "magic", structure: true, color: "#7ff0b2", description: "Build a Rune: regenerate Shield HP slowly. Maximum two." }
     },
+    weaponStats: {
+      cannon: ["50 DAMAGE", "1.4s WIND-UP"],
+      volley: ["14 DAMAGE", "0.18s WIND-UP"]
+    },
+    cardStats: {
+      tapForge: ["+0.20 TAPS/SEC", "+2 TAPS", "MAX 3"],
+      glassReactor: ["+0.28 TAPS/SEC", "-18 CORE HP", "MAX 2"],
+      scavenger: ["+8 TAPS"],
+      emergencyCache: ["+5 TAPS", "+10 WALL HP"],
+      rampart: ["+28 WALL HP"],
+      bulwark: ["+48 WALL HP", "100 WALL CAP", "20s"],
+      phaseShield: ["+45 SHIELD HP"],
+      repairDrone: ["+30 CORE HP", "+20 SHIELD AT FULL CORE"],
+      saboteur: ["12 DAMAGE", "-2 ENEMY TAPS"],
+      sappers: ["55 WALL DAMAGE", "15 DAMAGE IF BREACHED"],
+      timeBomb: ["65 DAMAGE", "4s WIND-UP"],
+      leechSpire: ["25 DAMAGE", "+UP TO 25 WALL HP"],
+      jammer: ["+1.5s ENEMY WIND-UPS", "-50% ENEMY TAP REGEN", "5s"],
+      overclock: ["+60% NEXT WEAPON DAMAGE"],
+      berserker: ["+35% NEXT WEAPON DAMAGE", "-12 CORE HP"],
+      echoRelay: ["+2 PROGRESS", "EACH AVAILABLE LANE"],
+      salvageGuild: ["+0.10 TAPS/SEC", "MAX 3"],
+      piercingShot: ["30 DAMAGE"],
+      siegeSalvo: ["48 WALL DAMAGE", "28 DAMAGE IF BREACHED"],
+      suppressingFire: ["18 DAMAGE", "+0.8s ENEMY WEAPON WIND-UP"],
+      executionOrder: ["42 DAMAGE", "60 BELOW HALF CORE"],
+      watchtower: ["+10% WEAPON DAMAGE", "MAX 2"],
+      pickpockets: ["STEAL UP TO 3 TAPS"],
+      scoutCamp: ["+0.12 TAPS/SEC", "MAX 2"],
+      masonCrew: ["+22 WALL HP"],
+      arcLightning: ["36 DAMAGE"],
+      gravityWell: ["+0.8s ENEMY WIND-UPS", "-50% ENEMY TAP REGEN", "3s"],
+      nullSigil: ["-UP TO 3 ACTION TAPS"],
+      growthRune: ["+0.16 SHIELD/SEC", "MAX 2"]
+    },
     defaultDeck: ["rampart", "phaseShield", "piercingShot", "tapForge", "timeBomb", "suppressingFire"],
     deckSize: 6,
-    handSize: 3
+    handSize: 4
   };
 
   if (typeof module !== "undefined" && module.exports) module.exports = data;

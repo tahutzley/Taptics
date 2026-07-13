@@ -9,24 +9,30 @@ npm install
 npm start
 ```
 
-Open `http://localhost:3000`. **Play CPU** starts an authoritative server-simulated training match. Open the app in two browser windows and choose **Find Rival** in both to test online matchmaking.
+Open `http://localhost:3000`. **Battle CPU** starts an authoritative server-simulated training match. Open the app in two browser windows and choose **Search for Battle** in both to test online matchmaking.
+
+## Main menu
+
+The battle-first home screen centers the player's local ELO, online matchmaking, and CPU training. A compact daily challenge and active loadout sit below the battle controls. Persistent bottom navigation switches between Battle and the full-screen six-card Deck builder at any time; Challenges is visible but disabled for now. The Deck builder has no separate back control and keeps **Save Loadout** above the full card library.
 
 ## Core loop
 
 - Players start with 10 of a maximum 40 taps.
-- Every loadout contains exactly six unique cards, with three cards visible in the battle hand.
-- Completing a card immediately replaces it with the next queued card and moves the completed card to the bottom of the cycle.
-- Partial tap progress stays attached to its card while that card remains in the hand.
+- Every loadout contains exactly six unique cards, with four cards visible in the battle hand.
+- Clicking a card deploys it to its Attack, Crew, or Magic battlefield zone and leaves an outlined blank in its original hand slot.
+- Up to three cards can be staged at once, one per category. An untouched staged card can be swapped for another hand card in the same category.
+- The first committed tap locks that category. Completing the card fills its reserved hand slot with the next queued card and moves the completed card to the bottom of the cycle.
 - Each loadout separately chooses **Cannon** or **Volley** as a permanent weapon that never enters the card cycle.
 - **Cannon** costs 8 taps, winds up for 1.4 seconds, and deals 50 base damage.
 - **Volley** costs 3 taps, resolves in 0.18 seconds, and deals 14 base damage.
 - Only the chosen permanent weapon appears on the battlefield. It occupies the left-side Attack zone.
-- Cards belong to **Attack**, **Crew**, or **Magic**. Each category has one commitment lane, so a second card in that category is disabled while another is unfinished or activating.
+- Cards belong to **Attack**, **Crew**, or **Magic**. Each category has one visible staging lane; it becomes busy only after progress begins or while an action is activating.
 - The permanent weapon shares the Attack lane with Attack cards. Crew commitments animate the villagers; Magic commitments animate the rune circle.
-- Selecting a hand card places its card-colored tap target directly over the matching Attack, Crew, or Magic battlefield zone; there is no detached bottom tap button.
+- Deployed cards become their own card-colored tap targets over the matching battlefield zones. Both players see the queued identity and exact committed-tap count.
 - Constructed cards fill one of eight visible village structure tiles. A ninth structure cannot be built.
-- Destroying a wall salvages 4 taps for its owner, preserving a defensive decision after a breach.
+- Destroying a Wall does not refund taps or change passive income. Supply Guild provides steady regeneration instead of breach salvage.
 - Partial commitments, tap reserves, and action wind-ups are visible to both players.
+- Right-click any battle card to inspect its cost and core effect numbers without playing it or spending a tap. Right-click the same card again to close the panel, or right-click another card to switch it. Left click retains its immediate deploy/tap action; left click elsewhere or press Escape also closes the inspector.
 
 ## Siphon counterplay
 
@@ -60,7 +66,7 @@ The CPU has several complete decks and strategic plans but follows the same hand
 - Visible opponent intent and counterplay instead of surprise outcomes
 - Mastery feedback based on reserve efficiency and sequencing
 - Varied CPU plans and optional self-imposed field tests
-- Close-game recovery through wall salvage rather than hidden rubber-banding
+- Stable, readable tap income with no hidden Wall-break rubber-banding
 - No paid power, forced timers, loot boxes, or penalties for leaving
 
 ## Accessibility baseline

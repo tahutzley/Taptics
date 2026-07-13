@@ -30,16 +30,16 @@ Express serves `public/`. Socket.IO handles CPU starts, online matchmaking, acti
 1. A client emits `startCpu` or `findMatch` with `{ deck, weapon }`.
 2. `validateLoadout()` accepts exactly six known unique cards and a known weapon; invalid input falls back to the default deck and Cannon.
 3. `makeMatch()` creates both private player states. Human and CPU players start from the same resource/rule model.
-4. A client emits `action` with `type: "tap" | "siphon"`, `source: "weapon" | "card"`, and an optional card `key`.
-5. `handleTap()` or `handleSiphon()` revalidates reserve, cooldown, hand membership, pending state, lane ownership, and target progress.
-6. Completed commitments become pending jobs with server timestamps. Cards cycle immediately when fully committed; effects resolve after wind-up.
+4. A client emits `action` with `type: "place" | "tap" | "siphon"`. Placement carries `key` and `slot`; tap/siphon carry `source` and an optional card `key`.
+5. `handlePlaceCard()` validates hand-slot ownership and zero-progress swaps. `handleTap()` and `handleSiphon()` revalidate reserve, cooldown, placed-card membership, pending state, lane ownership, and target progress.
+6. Completed commitments become pending jobs with server timestamps. The card's reserved blank slot draws immediately; effects resolve after wind-up.
 7. `tickMatch()` regenerates resources, resolves jobs, advances the CPU, detects core destruction, and broadcasts a serialized snapshot every 100ms.
 
 Never trust client-reported costs, progress, damage, time, target legality, deck validity, or outcomes.
 
 ## State boundaries
 
-Private player state includes exact resource counters, queue order, cooldowns, effect timers, pending jobs, structures, siphon locks, stats, and bot decision state. `publicPlayer()` explicitly constructs the state sent to both clients. Add new public fields there deliberately; do not serialize the private object wholesale.
+Private player state includes exact resource counters, hand/queue order, per-category `placed` entries, cooldowns, effect timers, pending jobs, structures, siphon locks, stats, and bot decision state. `publicPlayer()` explicitly constructs the state sent to both clients. Add new public fields there deliberately; do not serialize the private object wholesale.
 
 The public match snapshot has:
 
@@ -58,6 +58,6 @@ Socket events are:
 - Change concrete card effects in `resolveCard()` and add focused tests.
 - Change match pacing in `phaseAt()`, regeneration in `tickMatch()`, and core constants near the top of `server.js`.
 - Change CPU loadouts in `CPU_PLANS`; change its decisions in `chooseBotTarget()`, `chooseBotSiphonTarget()`, and `tickBot()`.
-- Change damage routing and Wall salvage in `dealDamage()`.
+- Change damage routing and Wall-break events in `dealDamage()`.
 
 When adding timers, keep time authoritative and expressed as absolute server timestamps in public pending jobs. When adding match state, decide whether it is private, public, or derived before exposing it.

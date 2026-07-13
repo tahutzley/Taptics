@@ -18,7 +18,6 @@ const CHALLENGES = [
 let profile = loadProfile();
 let builderDeck = [];
 let builderWeapon = "cannon";
-let selectedTarget = { source: "card", slot: 0 };
 let matchState = null;
 let ownSide = 1;
 let mode = "cpu";
@@ -30,6 +29,7 @@ let lastDoubleTaps = false;
 let soundEnabled = true;
 let audioContext = null;
 let toastTimer = null;
+let inspectedElement = null;
 
 function defaultProfile() {
   return { version: 4, duels: 0, wins: 0, run: 0, bestRun: 0, challenge: 0, challengeComplete: false, recent: [], deck: [...DATA.defaultDeck], weapon: "cannon" };
@@ -53,8 +53,25 @@ function formatTime(seconds) {
   return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, "0")}`;
 }
 function loadout() { return { deck: [...profile.deck], weapon: profile.weapon }; }
+function currentRating() { return Math.max(0, 1000 + profile.wins * 30 - (profile.duels - profile.wins) * 20); }
 
 function renderProfile() {
+  const rating = currentRating();
+  const leagues = [
+    { name: "BRONZE LEAGUE", floor: 0, ceiling: 1200 },
+    { name: "SILVER LEAGUE", floor: 1200, ceiling: 1500 },
+    { name: "GOLD LEAGUE", floor: 1500, ceiling: 1800 },
+    { name: "MASTER LEAGUE", floor: 1800, ceiling: 2100 },
+    { name: "CHAMPION LEAGUE", floor: 2100, ceiling: 2400 }
+  ];
+  const league = leagues.find(entry => rating < entry.ceiling) || leagues.at(-1);
+  const nextLeague = leagues[leagues.indexOf(league) + 1];
+  const progress = clamp((rating - league.floor) / (league.ceiling - league.floor), 0, 1);
+  $("#rating-value").textContent = rating;
+  $("#header-rating").textContent = rating;
+  $("#rating-league").textContent = league.name;
+  $("#rating-progress").style.width = `${progress * 100}%`;
+  $("#rating-next").textContent = nextLeague ? `${league.ceiling - rating} ELO TO ${nextLeague.name.replace(" LEAGUE", "")}` : "TOP LEAGUE";
   $("#stat-duels").textContent = profile.duels;
   $("#stat-winrate").textContent = profile.duels ? `${Math.round(profile.wins / profile.duels * 100)}%` : "--";
   $("#stat-run").textContent = profile.run;
@@ -74,12 +91,30 @@ function renderLobbyLoadout() {
   $("#loadout-weapon-name").textContent = weapon.name.toUpperCase();
   $("#loadout-weapon-copy").textContent = `${weapon.cost} taps - ${weapon.description}`;
 }
+function setMenuTab(tab) {
+  const battleActive = tab === "battle";
+  $("#battle-tab").classList.toggle("active", battleActive);
+  $("#open-deck").classList.toggle("active", !battleActive);
+  if (battleActive) {
+    $("#battle-tab").setAttribute("aria-current", "page");
+    $("#open-deck").removeAttribute("aria-current");
+  } else {
+    $("#open-deck").setAttribute("aria-current", "page");
+    $("#battle-tab").removeAttribute("aria-current");
+  }
+}
 function showLobby() {
   gameActive = false;
   matchState = null;
+  hideCardInspector();
   $("#game").classList.add("hidden");
+  $("#deck-screen").classList.add("hidden");
   $("#lobby").classList.remove("hidden");
+  $("#main-menu-tabs").classList.remove("hidden");
+  document.body.classList.add("menu-active");
   $("#result-modal").classList.add("hidden");
+  $(".lobby-scroll").scrollTop = 0;
+  setMenuTab("battle");
   window.scrollTo({ top: 0, behavior: "auto" });
   renderProfile();
 }
@@ -89,6 +124,9 @@ function showGame() {
   lastPhase = null;
   lastDoubleTaps = false;
   $("#lobby").classList.add("hidden");
+  $("#deck-screen").classList.add("hidden");
+  $("#main-menu-tabs").classList.add("hidden");
+  document.body.classList.remove("menu-active");
   $("#game").classList.remove("hidden");
   $("#result-modal").classList.add("hidden");
   $("#mode-label").textContent = mode === "cpu" ? "TRAINING" : "ONLINE";
@@ -115,7 +153,13 @@ function openDeckBuilder() {
   builderDeck = [...profile.deck];
   builderWeapon = profile.weapon;
   renderDeckBuilder();
-  $("#deck-modal").classList.remove("hidden");
+  $("#lobby").classList.add("hidden");
+  $("#deck-screen").classList.remove("hidden");
+  $("#main-menu-tabs").classList.remove("hidden");
+  document.body.classList.add("menu-active");
+  $("#deck-screen").scrollTop = 0;
+  setMenuTab("deck");
+  $("#open-deck").focus({ preventScroll: true });
 }
 function renderDeckBuilder() {
   $("#builder-count").textContent = `${builderDeck.length} / ${DATA.deckSize}`;
@@ -156,31 +200,15 @@ function saveDeckBuilder() {
   profile.deck = [...builderDeck];
   profile.weapon = builderWeapon;
   saveProfile();
-  $("#deck-modal").classList.add("hidden");
   renderProfile();
   toast("LOADOUT SAVED");
 }
 
-function definitionForTarget(player, target = selectedTarget) {
-  if (!player) return null;
-  if (target.source === "weapon") return DATA.weapons[player.weapon];
-  const key = player.hand[target.slot];
-  return DATA.cards[key];
-}
-function keyForTarget(player, target = selectedTarget) { return target.source === "weapon" ? player.weapon : player.hand[target.slot]; }
-function targetPending(player, target = selectedTarget) {
-  const key = keyForTarget(player, target);
-  return player?.pending?.some(job => job.source === target.source && job.key === key);
-}
-function targetProgress(player, target = selectedTarget) {
-  if (!player) return 0;
-  return target.source === "weapon" ? player.weaponProgress : player.cardProgress[player.hand[target.slot]] || 0;
-}
 function laneOccupant(player, category) {
   if (!player || !category) return null;
   if (category === "attack" && (player.weaponProgress > 0 || player.pending.some(job => job.source === "weapon"))) return { source: "weapon", key: player.weapon };
-  const partial = player.hand.find(key => DATA.cards[key].category === category && (player.cardProgress[key] || 0) > 0);
-  if (partial) return { source: "card", key: partial };
+  const placed = player.placed?.[category];
+  if (placed && (player.cardProgress[placed.key] || 0) > 0) return { source: "card", key: placed.key };
   const pending = player.pending.find(job => job.source === "card" && DATA.cards[job.key]?.category === category);
   return pending ? { source: "card", key: pending.key } : null;
 }
@@ -189,49 +217,31 @@ function laneBlocked(player, source, key) {
   const occupant = laneOccupant(player, category);
   return Boolean(occupant && (occupant.source !== source || occupant.key !== key));
 }
-function targetBlocked(player, target = selectedTarget) {
-  if (!player || player.taps < 1 || !definitionForTarget(player, target) || targetPending(player, target)) return true;
-  const key = keyForTarget(player, target);
-  return laneBlocked(player, target.source, key);
-}
-function selectTarget(source, slot = 0) {
-  selectedTarget = source === "weapon" ? { source: "weapon" } : { source: "card", slot };
-  renderBattleHand();
-  renderActionControls();
-  tone(260, .018, "sine", .025);
-}
-function cardButton(key, slot, player) {
+function cardButton(key, slot) {
+  if (!key) return `<div class="action-card hand-placeholder" data-hand-placeholder="${slot}" aria-label="Card ${slot + 1} is queued on the battlefield"><span>${slot + 1}</span><b>QUEUED</b></div>`;
   const card = DATA.cards[key];
-  const progress = player.cardProgress[key] || 0;
-  const selected = selectedTarget.source === "card" && selectedTarget.slot === slot;
-  const pending = player.pending.some(job => job.source === "card" && job.key === key);
   const category = DATA.categories[card.category];
-  return `<button class="action-card battle-card category-${card.category} ${selected ? "selected" : ""} ${pending ? "pending" : ""}" data-hand-slot="${slot}" data-busy-label="${category.name.toUpperCase()} IS BUSY" style="--card-color:${card.color};--category-color:${category.color}"><span class="action-key" style="border-color:${card.color}">${card.short}</span><b class="action-name">${card.name}</b><em>${card.cost}<small>T</small></em><i class="action-progress" style="width:${progress / card.cost * 100}%;background:${category.color}"></i></button>`;
+  return `<button class="action-card battle-card category-${card.category}" data-hand-slot="${slot}" data-card-key="${key}" data-busy-label="${category.name.toUpperCase()} IS BUSY" aria-label="Place ${card.name} in the ${category.name} zone" style="--card-color:${card.color};--category-color:${category.color}"><span class="action-key" style="border-color:${card.color}">${card.short}</span><b class="action-name">${card.name}</b><em>${card.cost}<small>T</small></em></button>`;
 }
 function renderBattleHand() {
   const player = me();
   if (!player) return;
-  if (selectedTarget.source === "card" && !player.hand[selectedTarget.slot]) selectedTarget = { source: "card", slot: 0 };
   const hand = $("#battle-hand");
-  const handSignature = player.hand.join("|");
+  const handSignature = player.hand.map(key => key || "_").join("|");
   if (hand.dataset.signature !== handSignature) {
-    hand.innerHTML = player.hand.map((key, slot) => cardButton(key, slot, player)).join("");
+    if (inspectedElement && hand.contains(inspectedElement)) hideCardInspector();
+    hand.innerHTML = player.hand.map((key, slot) => cardButton(key, slot)).join("");
     hand.dataset.signature = handSignature;
   }
-  $$('[data-hand-slot]').forEach(button => {
+  $$('#battle-hand [data-hand-slot]').forEach(button => {
     const slot = Number(button.dataset.handSlot);
     const key = player.hand[slot];
     const card = DATA.cards[key];
-    const selected = selectedTarget.source === "card" && selectedTarget.slot === slot;
-    const blocked = laneBlocked(player, "card", key);
-    button.classList.toggle("selected", selected);
-    button.classList.toggle("pending", player.pending.some(job => job.source === "card" && job.key === key));
+    const blocked = Boolean(laneOccupant(player, card.category));
     button.classList.toggle("disabled", blocked);
     button.disabled = blocked;
     button.setAttribute("aria-disabled", String(blocked));
     button.dataset.busyLabel = `${DATA.categories[card.category].name.toUpperCase()} IS BUSY`;
-    button.querySelector(".action-key").style.background = selected ? card.color : "";
-    button.querySelector(".action-progress").style.width = `${(player.cardProgress[key] || 0) / card.cost * 100}%`;
   });
   const next = DATA.cards[player.nextCard];
   $("#next-card-label").textContent = next ? `NEXT: ${next.name.toUpperCase()}` : "NEXT: --";
@@ -241,32 +251,12 @@ function renderBattleHand() {
   $("#weapon-cost").textContent = weapon.cost;
   const weaponButton = $("#weapon-card");
   weaponButton.style.setProperty("--card-color", weapon.color);
-  weaponButton.classList.toggle("selected", selectedTarget.source === "weapon");
   weaponButton.classList.toggle("pending", player.pending.some(job => job.source === "weapon"));
   const weaponBlocked = laneBlocked(player, "weapon", player.weapon);
   weaponButton.classList.toggle("disabled", weaponBlocked);
   weaponButton.disabled = weaponBlocked;
   weaponButton.querySelector(".action-progress").style.width = `${player.weaponProgress / weapon.cost * 100}%`;
-}
-function renderActionControls() {
-  const player = me();
-  const definition = definitionForTarget(player);
-  if (!definition) return;
-  const progress = targetProgress(player);
-  const categoryKey = selectedTarget.source === "weapon" ? "attack" : definition.category;
-  const category = DATA.categories[categoryKey];
-  const button = $("#commit-button");
-  const blocked = targetBlocked(player);
-  button.className = `lane-commit target-${categoryKey} category-${categoryKey}${blocked ? " locked" : ""}`;
-  button.style.setProperty("--action-color", definition.color);
-  button.style.setProperty("--action-progress", progress / definition.cost);
-  button.disabled = blocked;
-  button.setAttribute("aria-label", `${blocked ? "Cannot use" : "Tap to use"} ${definition.name}. ${progress} of ${definition.cost} taps committed.`);
-  $("#commit-icon").textContent = definition.short;
-  const laneBusy = laneBlocked(player, selectedTarget.source, keyForTarget(player));
-  $("#commit-lane").textContent = targetPending(player) ? "WINDING UP" : laneBusy ? `${category.name.toUpperCase()} BUSY` : player.taps < 1 ? "WAIT FOR TAPS" : `TAP ${category.name.toUpperCase()}`;
-  $("#commit-title").textContent = definition.name.toUpperCase();
-  $("#commit-progress").textContent = `${progress}/${definition.cost}`;
+  weaponButton.setAttribute("aria-label", `${weaponBlocked ? "Attack is busy. " : "Tap to load "}${weapon.name}. ${player.weaponProgress} of ${weapon.cost} taps committed.`);
 }
 
 function renderStructures(prefix, player) {
@@ -298,7 +288,8 @@ function applyCue(element, progress, pending, visible = true) {
 function cueState(player, category) {
   let progress = 0;
   if (category === "attack") progress = player.weaponProgress / DATA.weapons[player.weapon].cost;
-  for (const key of player.hand) if (DATA.cards[key].category === category) progress = Math.max(progress, (player.cardProgress[key] || 0) / DATA.cards[key].cost);
+  const placedKey = player.placed?.[category]?.key;
+  if (placedKey) progress = Math.max(progress, (player.cardProgress[placedKey] || 0) / DATA.cards[placedKey].cost);
   const pending = player.pending.some(job => job.source === "weapon" ? category === "attack" : DATA.cards[job.key]?.category === category);
   return { progress, pending };
 }
@@ -308,10 +299,12 @@ function siphonTarget(player, attacker, category) {
   if (category === "attack" && player.weaponProgress > 0 && !player.pending.some(job => job.source === "weapon")) {
     candidates.push({ source: "weapon", key: player.weapon, progress: player.weaponProgress / weapon.cost });
   }
-  for (const key of player.hand) {
-    const card = DATA.cards[key];
-    if (card.category !== category || (player.cardProgress[key] || 0) <= 0 || player.pending.some(job => job.source === "card" && job.key === key)) continue;
-    candidates.push({ source: "card", key, progress: player.cardProgress[key] / card.cost });
+  const placedKey = player.placed?.[category]?.key;
+  if (placedKey) {
+    const card = DATA.cards[placedKey];
+    if ((player.cardProgress[placedKey] || 0) > 0 && !player.pending.some(job => job.source === "card" && job.key === placedKey)) {
+      candidates.push({ source: "card", key: placedKey, progress: player.cardProgress[placedKey] / card.cost });
+    }
   }
   candidates.sort((a, b) => {
     const aLocked = attacker?.siphons?.[`${a.source}:${a.key}`]?.totalTaps > 0 ? 1 : 0;
@@ -336,6 +329,36 @@ function setSiphonCue(element, target, attacker) {
   element.dataset.siphonDots = `${"●".repeat(lock?.burst || 0)}${"○".repeat(3 - (lock?.burst || 0))}`;
 }
 function cueElement(prefix, category) { return $(`#${prefix}-${category === "attack" ? "weapon" : category}`); }
+function renderQueuedAction(prefix, player, category) {
+  const element = $(`#${prefix}-action-${category}`);
+  const entry = player.placed?.[category];
+  const pendingJob = player.pending.find(job => job.source === "card" && DATA.cards[job.key]?.category === category);
+  const key = entry?.key || pendingJob?.key;
+  if (!key) {
+    if (inspectedElement === element) hideCardInspector();
+    element.classList.add("hidden");
+    delete element.dataset.actionKey;
+    return;
+  }
+  const card = DATA.cards[key];
+  const progress = pendingJob ? card.cost : player.cardProgress[key] || 0;
+  const laneConflict = laneBlocked(player, "card", key);
+  const blocked = Boolean(pendingJob || player.taps < 1 || laneConflict);
+  element.classList.remove("hidden");
+  element.classList.toggle("locked", blocked);
+  element.classList.toggle("pending", Boolean(pendingJob));
+  element.style.setProperty("--action-color", card.color);
+  element.style.setProperty("--action-progress", progress / card.cost);
+  element.dataset.actionKey = key;
+  element.querySelector(".commit-icon").textContent = card.short;
+  const categoryName = DATA.categories[category].name.toUpperCase();
+  element.querySelector(".commit-copy small").textContent = pendingJob ? "WINDING UP" : prefix === "enemy" ? `${categoryName} ${progress > 0 ? "ACTIVE" : "STAGED"}` : laneConflict ? `${categoryName} BUSY` : player.taps < 1 ? "WAIT FOR TAPS" : `TAP ${categoryName}`;
+  element.querySelector(".commit-copy strong").textContent = card.name.toUpperCase();
+  element.querySelector(":scope > em").textContent = `${progress}/${card.cost}`;
+  const label = `${prefix === "enemy" ? "Rival" : "Your"} ${card.name}. ${progress} of ${card.cost} taps committed${pendingJob ? ", winding up" : ""}.`;
+  element.setAttribute("aria-label", label);
+  if (prefix === "own") element.disabled = blocked;
+}
 function renderProjectCues(prefix, player, attacker = null) {
   const weapon = DATA.weapons[player.weapon];
   const weaponElement = cueElement(prefix, "attack");
@@ -346,8 +369,11 @@ function renderProjectCues(prefix, player, attacker = null) {
   for (const category of ["attack", "crew", "magic"]) {
     const state = cueState(player, category);
     const element = cueElement(prefix, category);
+    const target = prefix === "enemy" ? siphonTarget(player, attacker, category) : null;
     applyCue(element, state.progress, state.pending, true);
-    setSiphonCue(element, prefix === "enemy" ? siphonTarget(player, attacker, category) : null, attacker);
+    setSiphonCue(element, target, attacker);
+    renderQueuedAction(prefix, player, category);
+    if (prefix === "enemy") setSiphonCue($(`#enemy-action-${category}`), target, attacker);
   }
 }
 function renderPhase(phase) {
@@ -385,7 +411,12 @@ function animateEvent(event) {
       projectile.className = `projectile ${ownAttack ? "own-projectile" : "enemy-projectile"}`;
     }, heavy ? 420 : 70);
     tone(heavy ? 90 : 180, .13, "square", .055);
-    if (event.type === "wallBreak" && event.salvageSide === ownSide) toast(`WALL BREACHED - ${event.salvage || 4} TAPS SALVAGED`);
+    if (event.type === "wallBreak") toast(event.targetSide === ownSide ? "YOUR WALL IS DOWN" : "RIVAL WALL IS DOWN");
+  }
+  if (event.type === "place") {
+    const element = $(`#${event.side === ownSide ? "own" : "enemy"}-action-${event.category}`);
+    element?.classList.add("arrived");
+    setTimeout(() => element?.classList.remove("arrived"), 360);
   }
   if (event.type === "siphon") {
     const ownAttack = event.side === ownSide;
@@ -416,10 +447,10 @@ function render(state) {
   $("#tap-value").textContent = Math.floor(player.taps);
   $("#tap-bar").style.width = `${player.taps / 40 * 100}%`;
   $("#enemy-tap-bar").style.width = `${enemy.taps / 40 * 100}%`;
-  const regen = (state.phase.regen + player.forges * .2 + player.glassReactors * .28 + player.scoutCamps * .12) * state.phase.tapMultiplier;
+  const regen = (state.phase.regen + player.forges * .2 + player.glassReactors * .28 + player.scoutCamps * .12 + (player.guilds || 0) * .1) * state.phase.tapMultiplier;
   $("#regen-value").textContent = `+${regen.toFixed(2)}/s`;
   const enemyHasProject = ["attack", "crew", "magic"].some(category => siphonTarget(enemy, player, category));
-  $("#reserve-hint").textContent = player.taps >= 39.8 ? "RESERVE CAPPED - regeneration is being wasted." : enemyHasProject ? "Purple target: tap the rival project 3 times to siphon its progress." : player.taps < 3 ? "Low reserve. Your hand is narrowing." : "Complete a card to rotate the next card into its hand slot.";
+  $("#reserve-hint").textContent = player.taps >= 39.8 ? "RESERVE CAPPED - regeneration is being wasted." : enemyHasProject ? "Purple target: tap the rival project 3 times to siphon its progress." : player.taps < 3 ? "Low reserve. Your hand is narrowing." : "Place cards into category zones, then tap each queued card directly.";
   renderWall("own", player);
   renderWall("enemy", enemy);
   renderStructures("own", player);
@@ -430,48 +461,153 @@ function render(state) {
   $("#enemy-label").textContent = bot?.name || "LIVE RIVAL";
   $("#enemy-plan").textContent = bot?.label || "ONLINE TACTICIAN";
   renderBattleHand();
-  renderActionControls();
   animateEvent(state.lastEvent);
 }
-function commitTap(event) {
-  const player = me();
-  if (!gameActive || !matchState || targetBlocked(player)) { tone(70, .035, "square", .02); return; }
-  const ripple = $(".tap-ripple");
-  const rect = $("#commit-button").getBoundingClientRect();
+function pulseTap(element, event) {
+  const ripple = element.querySelector(".tap-ripple");
+  if (!ripple) {
+    element.classList.remove("tap-pulse");
+    void element.offsetWidth;
+    element.classList.add("tap-pulse");
+    return;
+  }
+  const rect = element.getBoundingClientRect();
   ripple.style.left = `${(event?.clientX || rect.left + rect.width / 2) - rect.left}px`;
   ripple.style.top = `${(event?.clientY || rect.top + rect.height / 2) - rect.top}px`;
   ripple.classList.remove("go");
   void ripple.offsetWidth;
   ripple.classList.add("go");
-  tone(320 + targetProgress(player) * 18, .025, "sine", .018);
-  socket.emit("action", { type: "tap", source: selectedTarget.source, key: keyForTarget(player) });
+}
+function hideCardInspector() {
+  if (inspectedElement) {
+    inspectedElement.classList.remove("inspect-holding");
+    inspectedElement.removeAttribute("aria-describedby");
+  }
+  inspectedElement = null;
+  $("#card-inspector").classList.add("hidden");
+}
+function showCardInspector(source, key, anchor) {
+  const definition = source === "weapon" ? DATA.weapons[key] : DATA.cards[key];
+  if (!definition || !anchor) return;
+  hideCardInspector();
+  const category = source === "weapon" ? DATA.categories.attack : DATA.categories[definition.category];
+  const stats = source === "weapon" ? DATA.weaponStats?.[key] : DATA.cardStats?.[key];
+  const inspector = $("#card-inspector");
+  inspectedElement = anchor;
+  anchor.classList.add("inspect-holding");
+  anchor.setAttribute("aria-describedby", "card-inspector");
+  inspector.style.setProperty("--inspect-color", definition.color || category.color);
+  $("#inspector-icon").textContent = definition.short;
+  $("#inspector-category").textContent = source === "weapon" ? "PERMANENT WEAPON" : category.name.toUpperCase();
+  $("#inspector-name").textContent = definition.name.toUpperCase();
+  $("#inspector-cost").textContent = `${definition.cost} TAPS`;
+  $("#inspector-stats").innerHTML = (stats || []).map(stat => `<b>${stat}</b>`).join("");
+  inspector.classList.remove("hidden");
+  const anchorRect = anchor.getBoundingClientRect();
+  const inspectorRect = inspector.getBoundingClientRect();
+  const gap = 10;
+  const left = clamp(anchorRect.left + anchorRect.width / 2 - inspectorRect.width / 2, 10, window.innerWidth - inspectorRect.width - 10);
+  const above = anchorRect.top - inspectorRect.height - gap;
+  const top = above >= 10 ? above : Math.min(window.innerHeight - inspectorRect.height - 10, anchorRect.bottom + gap);
+  inspector.style.left = `${left}px`;
+  inspector.style.top = `${Math.max(10, top)}px`;
+}
+function inspectCardContext(event, element, source, key) {
+  if (!element || !key) return;
+  event.preventDefault();
+  event.stopPropagation();
+  if (inspectedElement === element && !$("#card-inspector").classList.contains("hidden")) {
+    hideCardInspector();
+    return;
+  }
+  showCardInspector(source, key, element);
+  tone(220, .035, "sine", .012);
+}
+function commitQueuedAction(event, element = event.currentTarget) {
+  if (event.type === "pointerdown" && event.button !== 0) return;
+  const player = me();
+  const category = element.dataset.queuedAction;
+  const key = element.dataset.actionKey;
+  const progress = player?.cardProgress?.[key] || 0;
+  if (!gameActive || !key || player.placed?.[category]?.key !== key || element.disabled || player.taps < 1) { tone(70, .035, "square", .02); return; }
+  event.preventDefault();
+  pulseTap(element, event);
+  tone(320 + progress * 18, .025, "sine", .018);
+  socket.emit("action", { type: "tap", source: "card", key });
 }
 function activateCommit(event) {
   if (event.type === "click" && event.detail !== 0) return;
-  event.preventDefault();
-  commitTap(event);
+  commitQueuedAction(event);
 }
 function activateCommitKey(event) {
   if (event.repeat || (event.key !== "Enter" && event.key !== " ")) return;
   event.preventDefault();
-  commitTap(event);
+  commitQueuedAction(event);
 }
-function selectHandCard(event) {
-  const button = event.target.closest("[data-hand-slot]");
-  if (!button || !event.currentTarget.contains(button)) return;
+function flyCard(source, destination, returning = false) {
+  if (!source || !destination) return;
+  const start = source.getBoundingClientRect();
+  const end = destination.getBoundingClientRect();
+  if (!start.width || !end.width) return;
+  const clone = source.cloneNode(true);
+  clone.removeAttribute("id");
+  clone.querySelectorAll("[id]").forEach(node => node.removeAttribute("id"));
+  clone.className = `card-flight ${returning ? "returning" : "deploying"}`;
+  Object.assign(clone.style, { left: `${start.left}px`, top: `${start.top}px`, width: `${start.width}px`, height: `${start.height}px` });
+  document.body.appendChild(clone);
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const moveX = end.left + end.width / 2 - (start.left + start.width / 2);
+  const moveY = end.top + end.height / 2 - (start.top + start.height / 2);
+  const scale = Math.min(1.25, end.width / start.width);
+  const animation = clone.animate([
+    { transform: "translate(0,0) scale(1) rotate(0deg)", opacity: 1 },
+    { transform: `translate(${moveX * .55}px,${moveY * .55 - 28}px) scale(1.08) rotate(${returning ? -3 : 3}deg)`, opacity: 1, offset: .58 },
+    { transform: `translate(${moveX}px,${moveY}px) scale(${scale}) rotate(0deg)`, opacity: .15 }
+  ], { duration: reduceMotion ? 1 : 340, easing: "cubic-bezier(.2,.8,.2,1)", fill: "forwards" });
+  animation.finished.finally(() => clone.remove());
+}
+function placeHandCard(event, explicitButton = null) {
+  if (event.type === "pointerdown" && event.button !== 0) return;
+  const button = explicitButton || event.target.closest("[data-hand-slot]");
+  if (!button || !$("#battle-hand").contains(button)) return;
   if (event.type === "click" && event.detail !== 0) return;
   event.preventDefault();
+  const player = me();
+  const slot = Number(button.dataset.handSlot);
+  const key = player?.hand?.[slot];
+  const card = DATA.cards[key];
+  if (!gameActive || !card || button.disabled || button.dataset.placing) { tone(70, .035, "square", .02); return; }
   button.focus({ preventScroll: true });
-  selectTarget("card", Number(button.dataset.handSlot));
+  const existing = player.placed?.[card.category];
+  if (existing) flyCard($(`#own-action-${card.category}`), $(`[data-hand-placeholder="${existing.slot}"]`), true);
+  flyCard(button, cueElement("own", card.category));
+  button.dataset.placing = "true";
+  setTimeout(() => delete button.dataset.placing, 500);
+  tone(280, .045, "triangle", .028);
+  socket.emit("action", { type: "place", key, slot });
 }
-function selectWeapon(event) {
+function placeHandCardKey(event) {
+  if (event.repeat || (event.key !== "Enter" && event.key !== " ")) return;
+  event.preventDefault();
+  placeHandCard(event);
+}
+function commitWeapon(event, element = event.currentTarget) {
+  if (event.type === "pointerdown" && event.button !== 0) return;
   if (event.type === "click" && event.detail !== 0) return;
   event.preventDefault();
-  event.currentTarget.focus({ preventScroll: true });
-  selectTarget("weapon");
+  const player = me();
+  if (!gameActive || !player || element.disabled || player.taps < 1) { tone(70, .035, "square", .02); return; }
+  pulseTap(element, event);
+  tone(360 + player.weaponProgress * 18, .025, "sine", .018);
+  socket.emit("action", { type: "tap", source: "weapon", key: player.weapon });
 }
-function siphonTap(event) {
-  const element = event.currentTarget;
+function commitWeaponKey(event) {
+  if (event.repeat || (event.key !== "Enter" && event.key !== " ")) return;
+  event.preventDefault();
+  commitWeapon(event);
+}
+function siphonTap(event, element = event.currentTarget) {
+  if (event.type === "pointerdown" && event.button !== 0) return;
   if (!gameActive || !element.classList.contains("counterable") || me()?.taps < 1) { tone(70, .035, "square", .02); return; }
   event.preventDefault();
   element.classList.remove("siphon-tap");
@@ -542,10 +678,11 @@ function tone(frequency, duration, type = "sine", volume = .04) {
 }
 
 $("#solo-button").addEventListener("click", startCpu);
+$("#challenge-play").addEventListener("click", startCpu);
 $("#online-button").addEventListener("click", toggleOnlineQueue);
+$("#battle-tab").addEventListener("click", showLobby);
 $("#open-deck").addEventListener("click", openDeckBuilder);
 $("#edit-deck").addEventListener("click", openDeckBuilder);
-$("#close-deck").addEventListener("click", () => $("#deck-modal").classList.add("hidden"));
 $("#save-deck").addEventListener("click", saveDeckBuilder);
 $("#weapon-options").addEventListener("click", event => {
   const button = event.target.closest("[data-weapon]");
@@ -553,14 +690,39 @@ $("#weapon-options").addEventListener("click", event => {
   builderWeapon = button.dataset.weapon;
   renderDeckBuilder();
 });
-$("#battle-hand").addEventListener("pointerdown", selectHandCard);
-$("#battle-hand").addEventListener("click", selectHandCard);
-$("#weapon-card").addEventListener("pointerdown", selectWeapon);
-$("#weapon-card").addEventListener("click", selectWeapon);
-$("#commit-button").addEventListener("pointerdown", activateCommit);
-$("#commit-button").addEventListener("click", activateCommit);
-$("#commit-button").addEventListener("keydown", activateCommitKey);
+$("#battle-hand").addEventListener("pointerdown", placeHandCard);
+$("#battle-hand").addEventListener("contextmenu", event => {
+  const button = event.target.closest("[data-hand-slot]");
+  if (!button || !event.currentTarget.contains(button)) return;
+  inspectCardContext(event, button, "card", button.dataset.cardKey);
+});
+$("#battle-hand").addEventListener("click", placeHandCard);
+$("#battle-hand").addEventListener("keydown", placeHandCardKey);
+$("#weapon-card").addEventListener("pointerdown", commitWeapon);
+$("#weapon-card").addEventListener("contextmenu", event => {
+  inspectCardContext(event, event.currentTarget, "weapon", me()?.weapon);
+});
+$("#weapon-card").addEventListener("click", commitWeapon);
+$("#weapon-card").addEventListener("keydown", commitWeaponKey);
+for (const category of ["attack", "crew", "magic"]) {
+  const action = $(`#own-action-${category}`);
+  action.addEventListener("pointerdown", activateCommit);
+  action.addEventListener("contextmenu", event => {
+    inspectCardContext(event, action, "card", action.dataset.actionKey);
+  });
+  action.addEventListener("click", activateCommit);
+  action.addEventListener("keydown", activateCommitKey);
+}
 for (const zone of ["weapon", "crew", "magic"]) $("#enemy-" + zone).addEventListener("pointerdown", siphonTap);
+for (const category of ["attack", "crew", "magic"]) {
+  const action = $(`#enemy-action-${category}`);
+  action.addEventListener("pointerdown", siphonTap);
+  action.addEventListener("contextmenu", event => {
+    inspectCardContext(event, action, "card", action.dataset.actionKey);
+  });
+}
+document.addEventListener("pointerdown", event => { if (event.button === 0) hideCardInspector(); }, true);
+document.addEventListener("keydown", event => { if (event.key === "Escape") hideCardInspector(); });
 $("#leave-battle").addEventListener("click", () => { socket.emit("leaveMatch"); showLobby(); });
 $("#lobby-button").addEventListener("click", () => {
   if (profile.challengeComplete) { profile.challenge = (profile.challenge + 1) % CHALLENGES.length; profile.challengeComplete = false; saveProfile(); }
@@ -589,7 +751,6 @@ socket.on("matchFound", ({ side, state }) => {
   ownSide = side;
   mode = state.mode;
   searching = false;
-  selectedTarget = { source: "card", slot: 0 };
   showGame();
   render(state);
 });
