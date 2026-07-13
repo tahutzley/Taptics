@@ -10,6 +10,7 @@ Repository context is a versioned product artifact, not chat memory. New convers
 | Match rules, constants, phases, resources, cycle, categories, siphon, damage, defenses, or structural limits | `gameplay.md` |
 | DOM structure, rendering, selection/input, visual cue grammar, local storage, responsiveness, or accessibility | `frontend.md` and possibly `public/AGENTS.md` |
 | Commands, harness, suite coverage, required checks, or test conventions | `testing.md` and possibly `test/AGENTS.md` |
+| Pixel-art sources/generated output, token grammar, asset/card inventory, redesign phase status, or release handoff | `docs/pixel-art-redesign/MASTER_PLAN.md`, the applicable inventory, and the current/final phase handoff |
 | Player-visible setup or implemented feature set | root `README.md` |
 | A new task domain with substantial durable context | Add one focused `docs/agent/*.md` file and one route in root `AGENTS.md` |
 

@@ -12,7 +12,9 @@ const requiredRoutes = [
   "docs/agent/gameplay.md",
   "docs/agent/frontend.md",
   "docs/agent/testing.md",
-  "docs/agent/maintenance.md"
+  "docs/agent/maintenance.md",
+  "docs/pixel-art-redesign/MASTER_PLAN.md",
+  "docs/pixel-art-redesign/PHASE_07_HANDOFF.md"
 ];
 
 test("agent context stays concise and all routed sources exist", () => {

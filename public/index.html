@@ -3,40 +3,39 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#090d16" />
+    <meta name="theme-color" content="#17130f" />
     <meta name="description" content="Taptics is a real-time 1v1 strategy game where every tap is a finite resource." />
     <title>Taptics - Every tap is a decision</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Chivo:wght@400;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+    <link rel="icon" type="image/png" href="/assets/pixel/ui-atlas.png" />
+    <link rel="stylesheet" href="/assets/pixel/pixel-art.css" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body class="menu-active">
     <main class="app-shell">
       <section id="lobby" class="lobby screen">
         <header class="lobby-header">
-          <a class="brand" href="#battle-home" aria-label="Taptics battle home"><span class="brand-mark">T</span><span>TAPTICS<small>PLAYER HQ</small></span></a>
-          <div class="player-summary" aria-label="Current player rating"><span class="mini-trophy" aria-hidden="true"></span><strong id="header-rating">1000</strong></div>
-          <button id="sound-toggle" class="icon-button" aria-label="Toggle sound">SOUND ON</button>
+          <a class="brand" href="#battle-home" aria-label="Taptics battle home"><span class="brand-mark pixel-sprite pixel-crest" aria-hidden="true"></span><span>TAPTICS<small>SIEGE LEDGER</small></span></a>
+          <div class="player-summary" aria-label="Current player rating"><span class="mini-trophy pixel-sprite pixel-nav-challenge" aria-hidden="true"></span><strong id="header-rating">1000</strong></div>
+          <button id="sound-toggle" class="icon-button pixel-button" aria-label="Sound" aria-pressed="true"><span class="pixel-sprite pixel-sound-on" aria-hidden="true"></span><b>SOUND ON</b></button>
         </header>
 
         <div class="lobby-scroll">
           <section id="battle-home" class="battle-home" aria-labelledby="rating-title">
             <div class="arena-backdrop" aria-hidden="true"><span></span><span></span><span></span></div>
-            <div class="rating-card">
-              <div class="league-badge" aria-hidden="true"><span>T</span></div>
+            <div class="rating-card pixel-panel panel-cloth">
+              <div class="league-badge pixel-badge" aria-hidden="true"><span class="pixel-sprite pixel-crest"></span></div>
               <p id="rating-league">BRONZE LEAGUE</p>
               <h1 id="rating-title"><span id="rating-value">1000</span><small>ELO</small></h1>
-              <div class="rating-track" aria-hidden="true"><i id="rating-progress"></i></div>
+              <div class="rating-track pixel-meter" aria-hidden="true"><i id="rating-progress"></i></div>
               <small id="rating-next">200 ELO TO SILVER</small>
             </div>
 
             <div class="match-buttons" aria-label="Battle modes">
-              <button id="online-button" class="primary-cta battle-cta"><span>SEARCH FOR BATTLE</span><small id="queue-message">Ranked real-time 1v1</small><i aria-hidden="true">VS</i></button>
-              <button id="solo-button" class="secondary-cta cpu-cta"><span>BATTLE CPU</span><small>Train with your active deck</small><i aria-hidden="true">CPU</i></button>
+              <button id="online-button" class="primary-cta battle-cta pixel-button" data-state="idle" aria-pressed="false" aria-busy="false"><span>SEARCH FOR BATTLE</span><small id="queue-message">Ranked real-time 1v1</small><i aria-hidden="true"><span class="pixel-sprite pixel-status-search"></span></i></button>
+              <button id="solo-button" class="secondary-cta cpu-cta pixel-button"><span>BATTLE CPU</span><small>Train with your active deck</small><i aria-hidden="true"><span class="pixel-sprite pixel-nav-battle"></span></i></button>
             </div>
 
-            <section class="record-strip" aria-label="Player record">
+            <section class="record-strip pixel-panel" aria-label="Player record">
               <div><small>DUELS</small><strong id="stat-duels">0</strong></div>
               <div><small>WIN RATE</small><strong id="stat-winrate">--</strong></div>
               <div><small>WIN STREAK</small><strong id="stat-run">0</strong></div>
@@ -44,16 +43,16 @@
             </section>
           </section>
 
-          <section id="challenge-panel" class="field-test panel" aria-labelledby="challenge-title">
-            <div class="challenge-icon" aria-hidden="true">★</div>
+          <section id="challenge-panel" class="field-test panel pixel-panel" aria-labelledby="challenge-title">
+            <div class="challenge-icon" aria-hidden="true"><span class="pixel-sprite pixel-nav-challenge"></span></div>
             <div class="challenge-copy-wrap"><div class="section-label"><span>DAILY CHALLENGE</span><b id="challenge-status">0 / 1</b></div><h2 id="challenge-title">Win with one economy engine</h2><p id="challenge-copy">Finish a CPU battle while mastering a tactical constraint.</p></div>
-            <button id="challenge-play" class="challenge-play" type="button" aria-label="Start this challenge against the CPU">PLAY</button>
+            <button id="challenge-play" class="challenge-play pixel-button" type="button" aria-label="Start this challenge against the CPU">PLAY</button>
           </section>
 
-          <section class="loadout-panel panel" aria-label="Active loadout">
+          <section class="loadout-panel panel pixel-panel" aria-label="Active loadout">
             <div class="section-label"><span>BATTLE DECK</span><button id="edit-deck">EDIT</button></div>
             <div id="loadout-deck" class="loadout-deck"></div>
-            <div class="loadout-weapon"><span>PERMANENT WEAPON</span><b id="loadout-weapon-name">CANNON</b><small id="loadout-weapon-copy">Heavy, efficient pressure</small></div>
+            <div class="loadout-weapon status-chip"><span>PERMANENT WEAPON</span><b id="loadout-weapon-name">CANNON</b><small id="loadout-weapon-copy">Heavy, efficient pressure</small></div>
           </section>
         </div>
 
@@ -61,95 +60,124 @@
 
       <section id="deck-screen" class="deck-screen screen hidden" aria-labelledby="deck-builder-title">
         <section class="deck-builder-modal">
-          <header class="deck-screen-header"><div><p class="eyebrow"><span></span> LOADOUT LAB</p><h2 id="deck-builder-title">DECK BUILDER</h2></div></header>
-          <p class="deck-builder-copy">Choose six unique cards across Attack, Crew, and Magic. Only one action in each lane can be committed at a time.</p>
-          <div class="weapon-builder"><div class="section-label"><span>PERMANENT WEAPON SLOT</span><b>ALWAYS AVAILABLE</b></div><div id="weapon-options" class="weapon-options"><button data-weapon="cannon">CANNON<small>8 taps / heavy hit</small></button><button data-weapon="volley">VOLLEY<small>3 taps / fast hit</small></button></div></div>
-          <div class="builder-selection"><div class="section-label"><span>YOUR DECK</span><b id="builder-count">6 / 6</b></div><div id="builder-deck" class="builder-deck"></div></div>
-          <button id="save-deck" class="primary-cta save-loadout"><span>SAVE LOADOUT</span><small>Use this cycle in CPU and online battles</small><i>-></i></button>
-          <div class="card-library-wrap"><div class="section-label"><span>PROTOTYPE CARD SET</span><b id="library-count">29 CARDS</b></div><div id="card-library" class="card-library"></div></div>
+          <header class="deck-screen-header"><div><p class="eyebrow"><span></span> QUARTERMASTER'S TABLE</p><h2 id="deck-builder-title" tabindex="-1">BUILD YOUR DECK</h2></div></header>
+          <p class="deck-builder-copy">Choose six unique cards in exact draw order, then arm one permanent weapon. Battles always use the last saved loadout.</p>
+          <div id="deck-status" class="deck-status pixel-panel"></div>
+          <button id="restore-deck" class="restore-deck pixel-button hidden" type="button">RESTORE SAVED LOADOUT</button>
+          <span id="deck-announcer" class="sr-only" role="status" aria-live="polite"></span>
+
+          <section class="weapon-builder pixel-panel" aria-labelledby="weapon-builder-title"><div class="section-label"><span id="weapon-builder-title">PERMANENT WEAPON</span><b>ALWAYS AVAILABLE</b></div><div id="weapon-options" class="weapon-options" role="group" aria-label="Choose one permanent weapon"></div></section>
+
+          <section class="builder-selection pixel-panel" aria-labelledby="builder-selection-title"><div class="section-label"><span id="builder-selection-title">SIX-CARD DRAW ORDER</span><b id="builder-count">6 / 6</b></div><div id="builder-deck" class="builder-deck" role="list" aria-label="Selected cards in draw order"></div></section>
+
+          <section id="deck-details" class="deck-details pixel-panel" aria-labelledby="deck-detail-name">
+            <div id="deck-detail-frame" class="deck-detail-frame" aria-hidden="true"></div>
+            <div class="deck-detail-copy"><small id="deck-detail-category">CARD DETAILS</small><h3 id="deck-detail-name">SELECT A CARD</h3><p id="deck-detail-description">Choose a card in the library or your draw order to inspect its rules.</p><div id="deck-detail-stats" class="deck-detail-stats"></div></div>
+            <button id="deck-detail-toggle" class="deck-detail-toggle pixel-button" type="button" disabled>SELECT A CARD</button>
+          </section>
+
+          <button id="save-deck" class="primary-cta save-loadout pixel-button"><span>SAVE LOADOUT</span><small>Use this exact order in CPU and online battles</small><i aria-hidden="true">&#10003;</i></button>
+
+          <section class="card-library-wrap" aria-labelledby="library-title"><div class="section-label"><span id="library-title">CARD ARMORY</span><b id="library-count">29 CARDS</b></div><div id="deck-filters" class="deck-filters" role="group" aria-label="Filter cards by category"><button type="button" data-deck-filter="all" aria-pressed="true">ALL</button><button type="button" data-deck-filter="attack" aria-pressed="false">ATTACK</button><button type="button" data-deck-filter="crew" aria-pressed="false">CREW</button><button type="button" data-deck-filter="magic" aria-pressed="false">MAGIC</button></div><div id="card-library" class="card-library" aria-label="Card library"></div></section>
         </section>
       </section>
 
       <nav id="main-menu-tabs" class="lobby-tabs" aria-label="Main menu">
-        <button id="battle-tab" class="lobby-tab active" type="button" aria-current="page"><span aria-hidden="true">VS</span><b>BATTLE</b></button>
-        <button id="open-deck" class="lobby-tab" type="button"><span aria-hidden="true">6</span><b>DECK</b></button>
-        <button class="lobby-tab disabled" type="button" disabled aria-label="Challenges coming soon"><span aria-hidden="true">SOON</span><b>CHALLENGES</b></button>
+        <button id="battle-tab" class="lobby-tab pixel-tab active" type="button" aria-current="page"><span class="pixel-sprite pixel-nav-battle" aria-hidden="true"></span><b>BATTLE</b></button>
+        <button id="open-deck" class="lobby-tab pixel-tab" type="button"><span class="pixel-sprite pixel-nav-deck" aria-hidden="true"></span><b>DECK</b></button>
+        <button class="lobby-tab pixel-tab disabled" type="button" disabled aria-disabled="true" aria-label="Challenges locked, coming soon"><span class="pixel-sprite pixel-nav-challenge" aria-hidden="true"></span><b>CHALLENGES</b><small>LOCKED</small></button>
       </nav>
 
       <section id="game" class="game screen hidden">
         <header class="battle-header">
-          <button id="leave-battle" class="back-button" aria-label="Leave battle"><span>&lt;</span></button>
-          <div class="fighter enemy-fighter"><div class="fighter-name"><span id="enemy-plan">ADAPTIVE CPU</span><b id="enemy-label">THE ARCHITECT</b></div><div class="fighter-meters"><div class="core-meter"><i id="enemy-core-bar"></i></div><div class="mini-tap-meter" aria-label="Rival tap reserve"><i id="enemy-tap-bar"></i></div></div><small><span id="enemy-core-value">360</span> CORE <span class="meter-key">TAP RESERVE</span></small></div>
+          <button id="leave-battle" class="back-button pixel-button" aria-label="Leave battle"><span>&lt;</span></button>
+          <div class="fighter enemy-fighter"><div class="fighter-name"><span id="enemy-plan">ADAPTIVE CPU</span><b id="enemy-label">THE ARCHITECT</b></div><div class="fighter-meters"><div class="core-meter"><i id="enemy-core-bar"></i></div><div id="enemy-tap-meter" class="mini-tap-meter" role="progressbar" aria-label="Rival tap reserve" aria-valuemin="0" aria-valuemax="40" aria-valuenow="10"><i id="enemy-tap-bar"></i></div></div><small><span id="enemy-core-value">360</span> CORE <span class="meter-key">TAP RESERVE</span></small></div>
           <div class="clock"><small id="mode-label">TRAINING</small><strong id="timer">0:00</strong></div>
         </header>
 
         <section class="phase-banner" id="phase-banner"><span id="phase-number">01</span><div><small id="phase-kicker">OPENING PHASE</small><b id="phase-name">FORTIFY</b></div><p id="phase-rule">Damage reduced 25%</p></section>
 
-        <section id="arena" class="arena panel" aria-label="Battlefield">
+        <section id="arena" class="arena panel" aria-label="Battlefield" tabindex="-1">
           <div class="grid-lines"></div>
           <div class="frontline"><span>FRONTLINE</span></div>
           <div class="base enemy-base">
-            <div id="enemy-weapon" class="weapon-zone cannon" aria-label="Rival weapon and Attack commitment"><i class="weapon-barrel"></i><span class="weapon-label">C</span><span class="volley-team"><i></i><i></i><i></i></span><em class="visual-load"></em></div>
-            <div class="core enemy-core"><span>RIVAL</span><b id="enemy-core-board">360</b></div>
-            <div id="enemy-crew" class="lane-zone crew-zone" aria-label="Rival Crew commitment"><span class="crew-people"><i class="worker"></i><i class="scout"></i><i class="builder"></i></span><b>CREW</b><em class="visual-load"></em></div>
-            <div id="enemy-magic" class="lane-zone magic-zone" aria-label="Rival Magic commitment"><span class="rune-mark"></span><b>MAGIC</b><em class="visual-load"></em></div>
-            <div id="enemy-structures" class="structure-grid" aria-label="Rival structure tiles"></div>
-            <button id="enemy-action-attack" class="lane-commit queued-action enemy-action target-attack hidden" data-queued-action="attack"><span class="commit-icon">--</span><span class="commit-copy"><small>RIVAL ATTACK</small><strong>EMPTY</strong></span><em>0/0</em><i class="commit-fill"></i></button>
-            <button id="enemy-action-crew" class="lane-commit queued-action enemy-action target-crew hidden" data-queued-action="crew"><span class="commit-icon">--</span><span class="commit-copy"><small>RIVAL CREW</small><strong>EMPTY</strong></span><em>0/0</em><i class="commit-fill"></i></button>
-            <button id="enemy-action-magic" class="lane-commit queued-action enemy-action target-magic hidden" data-queued-action="magic"><span class="commit-icon">--</span><span class="commit-copy"><small>RIVAL MAGIC</small><strong>EMPTY</strong></span><em>0/0</em><i class="commit-fill"></i></button>
-            <div id="enemy-wall" class="wall enemy-wall" aria-label="Rival Wall"><i></i><b id="enemy-wall-value">35</b></div>
+            <div id="enemy-weapon" class="weapon-zone cannon" role="button" tabindex="-1" aria-disabled="true" aria-label="Rival weapon and Attack commitment" aria-keyshortcuts="I F2"><span class="weapon-label">C</span><em class="visual-load"></em></div>
+            <div class="core enemy-core"><span>RIVAL CORE</span><b id="enemy-core-board">360</b><span class="core-board-meter" aria-hidden="true"><i id="enemy-core-bar-board"></i></span></div>
+            <div id="enemy-crew" class="lane-zone crew-zone" role="button" tabindex="-1" aria-disabled="true" aria-label="Rival Crew commitment" aria-keyshortcuts="I F2"><b>CREW</b><em class="visual-load"></em></div>
+            <div id="enemy-magic" class="lane-zone magic-zone" role="button" tabindex="-1" aria-disabled="true" aria-label="Rival Magic commitment" aria-keyshortcuts="I F2"><b>MAGIC</b><em class="visual-load"></em></div>
+            <div id="enemy-structures" class="structure-grid" role="list" aria-label="Rival structures, 0 of 8 built."></div>
+            <button id="enemy-action-attack" class="lane-commit queued-action enemy-action target-attack hidden" data-queued-action="attack" aria-disabled="true" aria-keyshortcuts="I F2"><span class="queued-frame-slot" aria-hidden="true"></span><span class="commit-icon">--</span><span class="commit-copy"><small>RIVAL ATTACK</small><strong>EMPTY</strong></span><em>0/0</em><i class="commit-fill"></i></button>
+            <button id="enemy-action-crew" class="lane-commit queued-action enemy-action target-crew hidden" data-queued-action="crew" aria-disabled="true" aria-keyshortcuts="I F2"><span class="queued-frame-slot" aria-hidden="true"></span><span class="commit-icon">--</span><span class="commit-copy"><small>RIVAL CREW</small><strong>EMPTY</strong></span><em>0/0</em><i class="commit-fill"></i></button>
+            <button id="enemy-action-magic" class="lane-commit queued-action enemy-action target-magic hidden" data-queued-action="magic" aria-disabled="true" aria-keyshortcuts="I F2"><span class="queued-frame-slot" aria-hidden="true"></span><span class="commit-icon">--</span><span class="commit-copy"><small>RIVAL MAGIC</small><strong>EMPTY</strong></span><em>0/0</em><i class="commit-fill"></i></button>
+            <div id="enemy-wall" class="wall enemy-wall" aria-label="Rival defenses"><span class="wall-art" aria-hidden="true"></span><span class="defense-meter defense-shield"><small>SHIELD</small><i><em id="enemy-shield-bar"></em></i><b id="enemy-shield-value">0</b></span><span class="defense-meter defense-wall"><small>WALL</small><i><em id="enemy-wall-bar"></em></i><b id="enemy-wall-value">35</b></span></div>
           </div>
-          <div id="enemy-projectile" class="projectile enemy-projectile"></div>
-          <div id="own-projectile" class="projectile own-projectile"></div>
+          <div id="battle-effects" class="battle-effects" aria-hidden="true"></div>
           <div class="base own-base">
-            <div id="own-wall" class="wall own-wall" aria-label="Your Wall"><i></i><b id="own-wall-value">35</b></div>
-            <div id="own-weapon" class="weapon-zone cannon" aria-label="Your weapon and Attack commitment"><i class="weapon-barrel"></i><span class="weapon-label">C</span><span class="volley-team"><i></i><i></i><i></i></span><em class="visual-load"></em></div>
-            <div class="core own-core"><span>YOU</span><b id="own-core-board">360</b></div>
-            <div id="own-crew" class="lane-zone crew-zone" aria-label="Your Crew commitment"><span class="crew-people"><i class="worker"></i><i class="scout"></i><i class="builder"></i></span><b>CREW</b><em class="visual-load"></em></div>
-            <div id="own-magic" class="lane-zone magic-zone" aria-label="Your Magic commitment"><span class="rune-mark"></span><b>MAGIC</b><em class="visual-load"></em></div>
-            <div id="own-structures" class="structure-grid" aria-label="Your structure tiles"></div>
-            <button id="own-action-attack" class="lane-commit queued-action target-attack hidden" data-queued-action="attack" aria-label="Attack card queue"><span class="tap-ripple"></span><span class="commit-icon">--</span><span class="commit-copy"><small>TAP ATTACK</small><strong>EMPTY</strong></span><em>0/0</em><i class="commit-fill"></i></button>
-            <button id="own-action-crew" class="lane-commit queued-action target-crew hidden" data-queued-action="crew" aria-label="Crew card queue"><span class="tap-ripple"></span><span class="commit-icon">--</span><span class="commit-copy"><small>TAP CREW</small><strong>EMPTY</strong></span><em>0/0</em><i class="commit-fill"></i></button>
-            <button id="own-action-magic" class="lane-commit queued-action target-magic hidden" data-queued-action="magic" aria-label="Magic card queue"><span class="tap-ripple"></span><span class="commit-icon">--</span><span class="commit-copy"><small>TAP MAGIC</small><strong>EMPTY</strong></span><em>0/0</em><i class="commit-fill"></i></button>
+            <div id="own-wall" class="wall own-wall" aria-label="Your defenses"><span class="wall-art" aria-hidden="true"></span><span class="defense-meter defense-shield"><small>SHIELD</small><i><em id="own-shield-bar"></em></i><b id="own-shield-value">0</b></span><span class="defense-meter defense-wall"><small>WALL</small><i><em id="own-wall-bar"></em></i><b id="own-wall-value">35</b></span></div>
+            <div id="own-weapon" class="weapon-zone cannon" aria-label="Your weapon and Attack commitment"><span class="weapon-label">C</span><em class="visual-load"></em></div>
+            <div class="core own-core"><span>YOUR CORE</span><b id="own-core-board">360</b><span class="core-board-meter" aria-hidden="true"><i id="own-core-bar-board"></i></span></div>
+            <div id="own-crew" class="lane-zone crew-zone" aria-label="Your Crew commitment"><b>CREW</b><em class="visual-load"></em></div>
+            <div id="own-magic" class="lane-zone magic-zone" aria-label="Your Magic commitment"><b>MAGIC</b><em class="visual-load"></em></div>
+            <div id="own-structures" class="structure-grid" role="list" aria-label="Your structures, 0 of 8 built."></div>
+            <button id="own-action-attack" class="lane-commit queued-action target-attack hidden" data-queued-action="attack" aria-label="Attack card queue" aria-keyshortcuts="I F2"><span class="tap-ripple"></span><span class="queued-frame-slot" aria-hidden="true"></span><span class="commit-icon">--</span><span class="commit-copy"><small>TAP ATTACK</small><strong>EMPTY</strong></span><em>0/0</em><i class="commit-fill"></i></button>
+            <button id="own-action-crew" class="lane-commit queued-action target-crew hidden" data-queued-action="crew" aria-label="Crew card queue" aria-keyshortcuts="I F2"><span class="tap-ripple"></span><span class="queued-frame-slot" aria-hidden="true"></span><span class="commit-icon">--</span><span class="commit-copy"><small>TAP CREW</small><strong>EMPTY</strong></span><em>0/0</em><i class="commit-fill"></i></button>
+            <button id="own-action-magic" class="lane-commit queued-action target-magic hidden" data-queued-action="magic" aria-label="Magic card queue" aria-keyshortcuts="I F2"><span class="tap-ripple"></span><span class="queued-frame-slot" aria-hidden="true"></span><span class="commit-icon">--</span><span class="commit-copy"><small>TAP MAGIC</small><strong>EMPTY</strong></span><em>0/0</em><i class="commit-fill"></i></button>
           </div>
-          <div id="impact-flash" class="impact-flash"></div>
         </section>
+
+        <p id="combat-status" class="sr-only" role="status" aria-live="polite"></p>
 
         <section class="reserve compact-reserve panel" aria-label="Your tap reserve">
           <div class="tap-count"><small>TAPS</small><strong><span id="tap-value">10</span><i>/40</i></strong></div>
-          <div class="reserve-track"><div class="reserve-meta"><b id="regen-value">+0.78/s</b><span>REGEN</span></div><div class="reserve-meter"><i id="tap-bar"></i><span id="reserve-notches"></span></div></div>
+          <div class="reserve-track"><div class="reserve-meta"><b id="regen-value">+0.78/s</b><span>REGEN</span></div><div class="reserve-meter"><i id="tap-bar"></i></div></div>
           <p id="reserve-hint" role="status" aria-live="polite" class="sr-only">Spend before the reserve caps or regeneration is wasted.</p>
         </section>
 
         <section class="action-section">
-          <div class="section-label"><span>FOUR-CARD HAND</span><b id="next-card-label">NEXT: --</b></div>
-          <div class="hand-row"><div id="battle-hand" class="battle-hand"></div><button id="weapon-card" class="weapon-card" data-source="weapon"><span id="weapon-short">C</span><div><small>WEAPON</small><b id="weapon-name">CANNON</b></div><em id="weapon-cost">8</em><i class="action-progress"></i></button></div>
+          <div class="section-label"><span>THREE-CARD HAND</span><b id="next-card-label">NEXT: --</b></div>
+          <div class="hand-row"><div id="battle-hand" class="battle-hand"></div><button id="weapon-card" class="weapon-card" data-source="weapon" aria-keyshortcuts="I F2"><span id="weapon-short" class="pixel-sprite pixel-portrait-fallback pixel-weapon-cannon" aria-hidden="true"><b>C</b></span><div><small>WEAPON</small><b id="weapon-name">CANNON</b></div><em id="weapon-cost">8</em><i class="action-progress"></i></button></div>
         </section>
       </section>
     </main>
 
-    <div id="result-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="result-title">
-      <section class="result-card">
-        <p id="result-kicker" class="eyebrow"><span></span> DUEL COMPLETE</p>
-        <h2 id="result-title">VICTORY</h2>
+    <div id="leave-modal" class="modal lifecycle-modal hidden" role="dialog" aria-modal="true" aria-labelledby="leave-title" aria-describedby="leave-copy">
+      <section class="confirmation-card pixel-modal-frame">
+        <span class="confirmation-emblem pixel-sprite pixel-status-warning" aria-hidden="true"></span>
+        <p class="eyebrow"><span></span> FORFEIT BATTLE</p>
+        <h2 id="leave-title">LEAVE THE FIELD?</h2>
+        <p id="leave-copy">Leaving immediately awards this duel to your rival. Your current battle cannot be resumed.</p>
+        <div class="confirmation-actions">
+          <button id="cancel-leave" class="secondary-cta pixel-button" type="button">STAY IN BATTLE</button>
+          <button id="confirm-leave" class="danger-button pixel-button" type="button">LEAVE AND FORFEIT</button>
+        </div>
+      </section>
+    </div>
+
+    <div id="result-modal" class="modal lifecycle-modal hidden" role="dialog" aria-modal="true" aria-labelledby="result-title" aria-describedby="result-copy result-read">
+      <section id="result-card" class="result-card pixel-modal-frame" data-outcome="victory" data-reason="core">
+        <div id="result-particles" class="result-particles" aria-hidden="true"></div>
+        <span id="result-emblem" class="result-emblem pixel-sprite pixel-result-victory" aria-hidden="true"></span>
+        <p id="result-kicker" class="eyebrow"><span id="result-reason-icon" class="pixel-sprite pixel-status-warning hidden" aria-hidden="true"></span><b id="result-reason">CORE DESTROYED</b></p>
+        <h2 id="result-title" tabindex="-1">VICTORY</h2>
         <p id="result-copy">You converted pressure into a decisive core advantage.</p>
         <div class="result-score"><div><small>YOUR CORE</small><b id="result-own-core">0</b></div><span>:</span><div><small>RIVAL CORE</small><b id="result-enemy-core">0</b></div></div>
         <div class="result-stats"><div><small>TAPS SPENT</small><b id="result-taps">0</b></div><div><small>DAMAGE</small><b id="result-damage">0</b></div><div><small>CAP WASTE</small><b id="result-waste">0s</b></div></div>
         <div class="battle-read"><small>TACTICAL READ</small><p id="result-read">Your reserve stayed useful throughout the match.</p></div>
-        <button id="again-button" class="primary-cta"><span>RUN IT BACK</span><small id="again-copy">New CPU plan, same rules</small><i>-></i></button>
-        <button id="lobby-button" class="text-button">Return to field terminal</button>
+        <button id="again-button" class="primary-cta pixel-button"><span>RUN IT BACK</span><small id="again-copy">New CPU plan, same rules</small><i aria-hidden="true">-&gt;</i></button>
+        <button id="lobby-button" class="text-button pixel-button">RETURN TO SIEGE LEDGER</button>
       </section>
     </div>
-    <aside id="card-inspector" class="card-inspector hidden" role="tooltip">
+    <aside id="card-inspector" class="card-inspector pixel-modal-frame hidden" role="tooltip">
       <div class="inspector-head">
-        <span id="inspector-icon">--</span>
+        <span id="inspector-icon" class="pixel-sprite pixel-portrait-fallback" aria-hidden="true"><b>--</b></span>
         <div><small id="inspector-category">CARD</small><strong id="inspector-name">CARD NAME</strong></div>
         <b id="inspector-cost">0 TAPS</b>
       </div>
       <div id="inspector-stats" class="inspector-stats"></div>
-      <p>LEFT-CLICK OR ESC TO CLOSE</p>
+      <p>RIGHT-CLICK OR PRESS I/F2 FOR DETAILS. REPEAT, CLICK ELSEWHERE, OR ESC TO CLOSE.</p>
     </aside>
-    <div id="toast" class="toast hidden" role="status" aria-live="polite"></div>
+    <div id="toast" class="toast pixel-modal-frame hidden" data-tone="notice" role="status" aria-live="polite"><span id="toast-icon" class="pixel-sprite pixel-crest" aria-hidden="true"></span><span id="toast-message"></span></div>
+    <p id="lifecycle-status" class="sr-only" role="status" aria-live="polite"></p>
     <script src="/socket.io/socket.io.js"></script>
     <script src="game-data.js"></script>
     <script src="app.js"></script>

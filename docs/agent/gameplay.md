@@ -17,12 +17,13 @@ Phases are derived from elapsed server time:
 | Clash | 25-120s | 0.72/s | 1.0x | 1.0x | 1x |
 | Overload | 120s+ | 0.88/s | rises 1.15x -> 2.15x by 240s | falls 0.70x -> 0.35x by 240s | 2x from 180s |
 
-Double Taps multiplies passive, Forge, Reactor, and Scout Camp generation; it does not duplicate manual commitments or card refunds.
+Double Taps multiplies passive, Bellows Guild (`tapForge`), Alchemist's Furnace (`glassReactor`), and Outrider Camp (`scoutCamp`) generation; it does not duplicate manual commitments or card refunds.
 
 ## Loadout and cycle
 
-- A loadout is exactly six unique known cards and one permanent Cannon or Volley.
-- Four cards are visible. The remaining two form an ordered queue.
+- A loadout is exactly six unique own-property catalogue keys and one permanent Cannon or Volley. Malformed, short, oversized, duplicate, unknown, or inherited-key card arrays fall back as a whole to the default deck; invalid weapons fall back independently to Cannon.
+- Saved card order is authoritative for the opening three-card hand and the remaining ordered queue. Deck reordering therefore changes draw order without changing any card rule.
+- Three cards are visible. The remaining three form an ordered queue.
 - A card must first be placed into its category. Placement removes it from the hand, records `{ key, slot }`, leaves that slot blank, and spends no tap.
 - One card may be staged in each category simultaneously. Before its first tap, it can be swapped for another same-category hand card; the old card returns to its original slot and the new card reserves its own slot.
 - Progress belongs to the staged card key. When it receives its final tap, progress clears, it becomes a pending wind-up, the next queued card fills its reserved slot immediately, and the completed card moves to the queue bottom.
@@ -61,13 +62,13 @@ The battlefield shows counterable zones and three burst pips. Siphon legality an
 
 ## Damage and defenses
 
-Damage is applied Shield -> Wall -> core unless an effect is Wall-only. Core damage is normally permanent; Repair Drone is the explicit healing exception and cannot exceed the starting core value.
+Damage is applied Shield -> Wall -> core unless an effect is Wall-only. Core damage is normally permanent; Field Chirurgeon (`repairDrone`) is the explicit healing exception and cannot exceed the starting core value.
 
 - Normal Wall cap: 80 HP.
-- Bulwark temporarily raises the cap to 100 HP; excess decays after the effect expires.
+- Stone Bulwark (`bulwark`) temporarily raises the cap to 100 HP; excess decays after the effect expires.
 - Shield cap: 90 HP.
 - A Wall breach changes no tap reserve or regeneration value.
-- Supply Guild (the `salvageGuild` data key) supplies steady `+0.10 taps/sec` per built copy instead of breach salvage.
+- Quartermaster's Guild (`salvageGuild`) supplies steady `+0.10 taps/sec` per built copy instead of breach salvage.
 - Overload increases damage while progressively weakening new Wall construction to prevent indefinite defense.
 
 ## Structures and catalogue

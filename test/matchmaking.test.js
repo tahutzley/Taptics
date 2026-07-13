@@ -3,7 +3,7 @@ const assert = require("node:assert/strict");
 const { readFileSync } = require("node:fs");
 const { join } = require("node:path");
 const { io: connect } = require("socket.io-client");
-const { server, io, ticker, GAME_DATA, makeMatch, handlePlaceCard, handleTap, handleSiphon, resolveCard, phaseAt, validateLoadout } = require("../server");
+const { server, io, ticker, GAME_DATA, RECENT_EVENT_LIMIT, makeMatch, handlePlaceCard, handleTap, handleSiphon, resolveCard, phaseAt, validateLoadout, serialize, addEvent, dealDamage } = require("../server");
 
 function once(socket, event) { return new Promise(resolve => socket.once(event, resolve)); }
 function stateMatching(socket, predicate, timeout = 1800) {
@@ -41,8 +41,8 @@ test("client keeps zoom and changing battle guidance accessible", () => {
   const battleCardRenderer = client.match(/function cardButton[\s\S]*?function renderBattleHand/)?.[0] || "";
   assert.doesNotMatch(html, /user-scalable\s*=\s*no/i);
   assert.match(html, /id="reserve-hint" role="status" aria-live="polite"/);
-  assert.match(html, /id="toast" class="toast hidden" role="status" aria-live="polite"/);
-  assert.match(html, /id="card-inspector" class="card-inspector hidden" role="tooltip"/);
+  assert.match(html, /id="toast" class="toast pixel-modal-frame hidden"[^>]+role="status" aria-live="polite"/);
+  assert.match(html, /id="card-inspector" class="card-inspector pixel-modal-frame hidden" role="tooltip"/);
   assert.match(html, /id="own-weapon"/);
   assert.match(html, /id="own-crew"/);
   assert.match(html, /id="own-magic"/);
@@ -50,7 +50,7 @@ test("client keeps zoom and changing battle guidance accessible", () => {
   assert.match(html, /id="own-action-attack" class="lane-commit queued-action target-attack/);
   assert.match(html, /id="own-action-crew" class="lane-commit queued-action target-crew/);
   assert.match(html, /id="own-action-magic" class="lane-commit queued-action target-magic/);
-  assert.match(html, /FOUR-CARD HAND/);
+  assert.match(html, /THREE-CARD HAND/);
   assert.doesNotMatch(html, /id="commit-button"/);
   assert.doesNotMatch(html, /class="(?:commit-note|own-status)"|id="own-(?:core-value|core-bar|wall-footer)"/);
   assert.match(client, /hand\.dataset\.signature !== handSignature/);
@@ -61,7 +61,7 @@ test("client keeps zoom and changing battle guidance accessible", () => {
   assert.match(client, /#battle-hand"\)\.addEventListener\("contextmenu"/);
   assert.match(client, /type: "place", key, slot/);
   assert.match(client, /data-busy-label="\$\{category\.name\.toUpperCase\(\)\} IS BUSY"/);
-  assert.match(client, /renderQueuedAction\(prefix, player, category\)/);
+  assert.match(client, /renderQueuedAction\(prefix, player, category, target\)/);
   assert.match(client, /action\.addEventListener\("click", activateCommit\)/);
   assert.match(client, /action\.addEventListener\("keydown", activateCommitKey\)/);
   assert.match(client, /action\.addEventListener\("contextmenu"/);
@@ -82,14 +82,36 @@ test("validates six unique cards and cycles a completed card to the bottom", () 
   const match = makeMatch("cycle-one", "cycle-two", { firstLoadout: { deck, weapon: "volley" } });
   const started = Date.now();
   assert.equal(handlePlaceCard(match, 1, { key: "emergencyCache", slot: 0 }), true);
-  assert.deepEqual(match.players[1].hand, [null, "rampart", "saboteur", "timeBomb"]);
+  assert.deepEqual(match.players[1].hand, [null, "rampart", "saboteur"]);
   for (let index = 0; index < GAME_DATA.cards.emergencyCache.cost; index++) {
     assert.equal(handleTap(match, 1, { source: "card", key: "emergencyCache" }, started + index * 100), true);
   }
-  assert.deepEqual(match.players[1].hand, ["echoRelay", "rampart", "saboteur", "timeBomb"]);
+  assert.deepEqual(match.players[1].hand, ["timeBomb", "rampart", "saboteur"]);
   assert.equal(match.players[1].queue.at(-1), "emergencyCache");
   assert.equal(match.players[1].placed.crew, null);
   assert.ok(match.players[1].pending.some(job => job.key === "emergencyCache"));
+});
+
+test("loadout validation rejects malformed, oversized, duplicate, and inherited catalogue keys", () => {
+  const deck = ["emergencyCache", "rampart", "saboteur", "timeBomb", "echoRelay", "tapForge"];
+  const invalidDecks = [
+    deck.slice(0, 5),
+    [...deck, "phaseShield"],
+    [...deck, deck[0]],
+    [...deck.slice(0, 5), deck[0]],
+    [...deck.slice(0, 5), "missingCard"],
+    [...deck.slice(0, 5), "toString"],
+    "not-an-array"
+  ];
+  for (const invalid of invalidDecks) {
+    const result = validateLoadout({ deck: invalid, weapon: "volley" });
+    assert.deepEqual(result.deck, GAME_DATA.defaultDeck);
+    assert.notEqual(result.deck, GAME_DATA.defaultDeck, "fallback decks must not share the registry array");
+    assert.equal(result.weapon, "volley", "deck and weapon validation remain independent");
+  }
+  assert.deepEqual(validateLoadout({ deck, weapon: "missingWeapon" }), { deck, weapon: "cannon" });
+  assert.deepEqual(validateLoadout({ deck, weapon: "toString" }), { deck, weapon: "cannon" });
+  assert.deepEqual(validateLoadout(null), { deck: GAME_DATA.defaultDeck, weapon: "cannon" });
 });
 
 test("placing reserves a hand slot and untouched same-category cards can swap", () => {
@@ -147,6 +169,71 @@ test("breaking a Wall never changes the defender's tap reserve", () => {
   assert.equal(match.lastEvent.salvage, undefined);
 });
 
+test("recent events are ordered, bounded, and retain legacy lastEvent", () => {
+  const match = makeMatch("events-one", "events-two");
+  for (let index = 0; index < RECENT_EVENT_LIMIT + 5; index++) addEvent(match, "card", 1, { card: "rampart", sequence: index });
+  assert.equal(match.recentEvents.length, RECENT_EVENT_LIMIT);
+  assert.ok(match.recentEvents.every((event, index, events) => index === 0 || event.id > events[index - 1].id));
+  assert.equal(match.lastEvent.id, match.recentEvents.at(-1).id);
+  const state = serialize(match);
+  assert.equal(state.lastEvent.id, state.recentEvents.at(-1).id);
+  assert.equal(state.recentEvents[0].sequence, 5);
+  const protectedEvent = addEvent(match, "place", 2, { id: 999, type: "unknown", side: 9, key: "rampart" });
+  assert.deepEqual({ id: protectedEvent.id, type: protectedEvent.type, side: protectedEvent.side }, { id: RECENT_EVENT_LIMIT + 6, type: "place", side: 2 });
+});
+
+test("same-tick resolutions remain distinct and damage reports every defense layer", () => {
+  const match = makeMatch("outcomes-one", "outcomes-two");
+  const now = Date.now();
+  resolveCard(match, 1, "rampart", now);
+  resolveCard(match, 2, "phaseShield", now);
+  const sameTick = match.recentEvents.slice(-2);
+  assert.deepEqual(sameTick.map(event => event.type), ["card", "card"]);
+  assert.ok(sameTick[0].id < sameTick[1].id);
+
+  match.players[2].shield = 10;
+  match.players[2].wallHp = 5;
+  dealDamage(match, 1, 20, "cannon");
+  assert.equal(match.lastEvent.type, "wallBreak");
+  assert.equal(match.lastEvent.targetSide, 2);
+  assert.deepEqual(match.lastEvent.damage, { shield: 10, wall: 5, core: 5 });
+  assert.deepEqual(match.lastEvent.outcomes[2].coreHp, { before: 360, after: 355, delta: -5 });
+  assert.deepEqual(match.lastEvent.outcomes[2].wallHp, { before: 5, after: 0, delta: -5 });
+  assert.deepEqual(match.lastEvent.outcomes[2].shield, { before: 10, after: 0, delta: -10 });
+});
+
+test("healing, full-core Shield, and self-damage expose authoritative outcomes", () => {
+  const match = makeMatch("healing-one", "healing-two");
+  match.players[1].coreHp = 340;
+  resolveCard(match, 1, "repairDrone", Date.now());
+  assert.deepEqual(match.lastEvent.outcomes[1].coreHp, { before: 340, after: 360, delta: 20 });
+  resolveCard(match, 1, "repairDrone", Date.now());
+  assert.deepEqual(match.lastEvent.outcomes[1].shield, { before: 0, after: 20, delta: 20 });
+  resolveCard(match, 2, "berserker", Date.now());
+  assert.deepEqual(match.lastEvent.outcomes[2].coreHp, { before: 360, after: 348, delta: -12 });
+});
+
+test("Bloodthorn Spire and Cutpurse Band expose both authoritative sides without extra formulas", () => {
+  const match = makeMatch("dual-one", "dual-two");
+  match.players[1].wallHp = 40;
+  match.players[2].shield = 5;
+  match.players[2].wallHp = 10;
+  resolveCard(match, 1, "leechSpire", match.startedAt + 30000);
+  assert.equal(match.lastEvent.type, "wallBreak");
+  assert.deepEqual(match.lastEvent.damage, { shield: 5, wall: 10, core: 10 });
+  assert.deepEqual(match.lastEvent.outcomes[1].wallHp, { before: 40, after: 65, delta: 25 });
+  assert.deepEqual(match.lastEvent.outcomes[2].shield, { before: 5, after: 0, delta: -5 });
+  assert.deepEqual(match.lastEvent.outcomes[2].wallHp, { before: 10, after: 0, delta: -10 });
+  assert.deepEqual(match.lastEvent.outcomes[2].coreHp, { before: 360, after: 350, delta: -10 });
+  assert.equal(match.recentEvents.filter(event => event.type === "wallBreak").length, 1);
+
+  match.players[1].taps = 10;
+  match.players[2].taps = 10;
+  resolveCard(match, 1, "pickpockets", match.startedAt);
+  assert.deepEqual(match.lastEvent.outcomes[1].taps, { before: 10, after: 13, delta: 3 });
+  assert.deepEqual(match.lastEvent.outcomes[2].taps, { before: 10, after: 7, delta: -3 });
+});
+
 test("structures occupy a maximum of eight visible village tiles", () => {
   const match = makeMatch("build-one", "build-two");
   const player = match.players[1];
@@ -184,7 +271,7 @@ test("pairs online players and shares tap commitments", async () => {
   assert.equal(state.players[1].weaponProgress, 1);
   assert.equal(GAME_DATA.weapons.cannon.cost, 8);
   assert.equal(state.players[1].deck.length, 6);
-  assert.equal(state.players[1].hand.length, 4);
+  assert.equal(state.players[1].hand.length, 3);
   assert.deepEqual(state.players[1].placed, { attack: null, crew: null, magic: null });
   assert.equal(state.timeLeft, undefined, "elimination matches should not have a score timeout");
 
@@ -193,6 +280,9 @@ test("pairs online players and shares tap commitments", async () => {
   const placedState = await placed;
   assert.equal(placedState.players[1].hand[0], null);
   assert.deepEqual(placedState.players[1].placed.crew, { key: "rampart", slot: 0 });
+  assert.ok(Array.isArray(placedState.recentEvents));
+  assert.equal(placedState.recentEvents.at(-1).type, "place");
+  assert.equal(placedState.lastEvent.id, placedState.recentEvents.at(-1).id);
 
   first.close();
   second.close();

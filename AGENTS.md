@@ -18,6 +18,7 @@ This file is the entry point for coding agents. Keep it short: it routes work to
 | Browser UI, battlefield, deck builder, accessibility, input, animation, or CSS | `public/AGENTS.md` and `docs/agent/frontend.md` |
 | Tests, regression coverage, or verification | `test/AGENTS.md` and `docs/agent/testing.md` |
 | Repository context structure or documentation maintenance | `docs/agent/maintenance.md` |
+| Medieval pixel-art redesign, asset pipeline, tokens, inventories, or phase status | `docs/pixel-art-redesign/MASTER_PLAN.md` and `docs/pixel-art-redesign/PHASE_07_HANDOFF.md` |
 
 ## Repository at a glance
 

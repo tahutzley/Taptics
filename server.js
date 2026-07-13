@@ -14,6 +14,7 @@ const MAX_TAPS = 40;
 const STARTING_CORE = 360;
 const STARTING_WALL = 35;
 const TAP_COOLDOWN_MS = 95;
+const RECENT_EVENT_LIMIT = 24;
 const queue = [];
 const matches = new Map();
 
@@ -33,10 +34,11 @@ function phaseAt(elapsed) {
   return { key: "overload", number: 3, regen: .88, damage: 1.15 + pressure, wallPower: .7 - pressure * .35, tapMultiplier: elapsed >= 180 ? 2 : 1 };
 }
 function validateLoadout(input = {}) {
-  const deck = Array.isArray(input.deck) ? input.deck.filter((key, index, list) => GAME_DATA.cards[key] && list.indexOf(key) === index) : [];
+  const candidate = input && typeof input === "object" ? input : {};
+  const deck = Array.isArray(candidate.deck) && candidate.deck.length === GAME_DATA.deckSize && new Set(candidate.deck).size === GAME_DATA.deckSize && candidate.deck.every(key => typeof key === "string" && Object.hasOwn(GAME_DATA.cards, key)) ? candidate.deck : [];
   return {
     deck: deck.length === GAME_DATA.deckSize ? deck : [...GAME_DATA.defaultDeck],
-    weapon: GAME_DATA.weapons[input.weapon] ? input.weapon : "cannon"
+    weapon: typeof candidate.weapon === "string" && Object.hasOwn(GAME_DATA.weapons, candidate.weapon) ? candidate.weapon : "cannon"
   };
 }
 function makePlayer(id, isBot = false, loadout = {}) {
@@ -62,7 +64,7 @@ function makeMatch(firstId, secondId, options = {}) {
     second = makePlayer(secondId, true, plan);
     second.bot = { key: plan.key, name: plan.name, label: plan.label, pace: plan.pace, nextDecisionAt: Date.now() + 500, target: null };
   } else second = makePlayer(secondId, false, options.secondLoadout);
-  const match = { id, mode: options.bot ? "cpu" : "online", players: { 1: first, 2: second }, startedAt: Date.now(), lastTick: Date.now(), ended: false, eventId: 0, jobId: 0, lastEvent: null };
+  const match = { id, mode: options.bot ? "cpu" : "online", players: { 1: first, 2: second }, startedAt: Date.now(), lastTick: Date.now(), ended: false, eventId: 0, jobId: 0, lastEvent: null, recentEvents: [] };
   matches.set(id, match);
   return match;
 }
@@ -83,10 +85,36 @@ function publicPlayer(player) {
 }
 function serialize(match) {
   const elapsed = (Date.now() - match.startedAt) / 1000;
-  return { id: match.id, mode: match.mode, elapsed, phase: phaseAt(elapsed), players: { 1: publicPlayer(match.players[1]), 2: publicPlayer(match.players[2]) }, lastEvent: match.lastEvent };
+  return { id: match.id, mode: match.mode, elapsed, phase: phaseAt(elapsed), players: { 1: publicPlayer(match.players[1]), 2: publicPlayer(match.players[2]) }, lastEvent: match.lastEvent, recentEvents: match.recentEvents.map(event => ({ ...event })) };
 }
 function broadcast(match) { io.to(match.id).emit("state", serialize(match)); }
-function addEvent(match, type, side, data = {}) { match.lastEvent = { id: ++match.eventId, type, side, at: Date.now(), ...data }; }
+function addEvent(match, type, side, data = {}) {
+  const event = { ...data, id: ++match.eventId, type, side, at: Date.now() };
+  match.lastEvent = event;
+  match.recentEvents.push(event);
+  if (match.recentEvents.length > RECENT_EVENT_LIMIT) match.recentEvents.splice(0, match.recentEvents.length - RECENT_EVENT_LIMIT);
+  return event;
+}
+function captureOutcomes(match) {
+  return Object.fromEntries([1, 2].map(side => {
+    const player = match.players[side];
+    return [side, { coreHp: player.coreHp, wallHp: player.wallHp, shield: player.shield, taps: player.taps }];
+  }));
+}
+function rounded(value) { return Math.round(value * 1000) / 1000; }
+function outcomeDeltas(before, match) {
+  const outcomes = {};
+  for (const side of [1, 2]) {
+    const changes = {};
+    for (const field of ["coreHp", "wallHp", "shield", "taps"]) {
+      const previous = before[side][field];
+      const current = match.players[side][field];
+      if (Math.abs(current - previous) > .0001) changes[field] = { before: rounded(previous), after: rounded(current), delta: rounded(current - previous) };
+    }
+    if (Object.keys(changes).length) outcomes[side] = changes;
+  }
+  return outcomes;
+}
 function removeFromQueue(id) { const index = queue.indexOf(id); if (index !== -1) queue.splice(index, 1); }
 function finish(match, winner, reason = "core") {
   if (!match || match.ended) return;
@@ -111,6 +139,7 @@ function joinMatch(socket, match, side) {
 }
 
 function dealDamage(match, side, amount, source, options = {}) {
+  const before = captureOutcomes(match);
   const targetSide = opponent(side);
   const attacker = match.players[side];
   const target = match.players[targetSide];
@@ -129,10 +158,18 @@ function dealDamage(match, side, amount, source, options = {}) {
   }
   const total = shieldDamage + wallDamage + coreDamage;
   attacker.stats.damage += total;
+  const data = {
+    source,
+    amount: rounded(total),
+    targetSide,
+    target: shieldDamage ? "shield" : wallDamage ? "wall" : "core",
+    damage: { shield: rounded(shieldDamage), wall: rounded(wallDamage), core: rounded(coreDamage) },
+    outcomes: outcomeDeltas(before, match)
+  };
   if (beforeWall > 0 && target.wallHp <= 0) {
     target.stats.wallBreaks++;
-    addEvent(match, "wallBreak", side, { source, amount: total, targetSide });
-  } else addEvent(match, "hit", side, { source, amount: total, target: shieldDamage ? "shield" : wallDamage ? "wall" : "core" });
+    addEvent(match, "wallBreak", side, data);
+  } else addEvent(match, "hit", side, data);
   return total;
 }
 function cyclePlacedCard(player, key) {
@@ -156,6 +193,8 @@ function buildStructure(player, key, limit) {
   return true;
 }
 function resolveCard(match, side, key, now) {
+  const before = captureOutcomes(match);
+  const firstResolutionEventId = match.eventId + 1;
   const player = match.players[side];
   const enemy = match.players[opponent(side)];
   const phase = phaseAt((now - match.startedAt) / 1000);
@@ -234,7 +273,12 @@ function resolveCard(match, side, key, now) {
     else player.shield = Math.min(90, player.shield + 12);
   }
   const damageCards = ["saboteur", "sappers", "timeBomb", "leechSpire", "piercingShot", "siegeSalvo", "suppressingFire", "executionOrder", "arcLightning"];
-  if (!damageCards.includes(key)) addEvent(match, "card", side, { card: key });
+  const outcomes = outcomeDeltas(before, match);
+  if (!damageCards.includes(key)) addEvent(match, "card", side, { card: key, outcomes });
+  else {
+    const event = [...match.recentEvents].reverse().find(item => item.id >= firstResolutionEventId && ["hit", "wallBreak"].includes(item.type));
+    if (event) event.outcomes = outcomes;
+  }
 }
 function resolveJob(match, side, job, now) {
   const player = match.players[side];
@@ -491,4 +535,4 @@ io.on("connection", socket => {
 });
 
 if (require.main === module) server.listen(PORT, () => console.log(`Taptics running on http://localhost:${PORT}`));
-module.exports = { server, io, ticker, GAME_DATA, makeMatch, handlePlaceCard, handleTap, handleSiphon, resolveCard, tickMatch, phaseAt, validateLoadout };
+module.exports = { server, io, ticker, GAME_DATA, RECENT_EVENT_LIMIT, makeMatch, handlePlaceCard, handleTap, handleSiphon, resolveCard, tickMatch, phaseAt, validateLoadout, serialize, addEvent, dealDamage };
