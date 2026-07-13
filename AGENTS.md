@@ -2,6 +2,10 @@
 
 This file is the entry point for coding agents. Keep it short: it routes work to the smallest relevant source of truth instead of duplicating the repository documentation.
 
+## Required workspace
+
+Use `D:\Taptics` as the only writable checkout for all repository changes, generated files, commands, and verification. Before acting, verify the resolved repository root is exactly `D:\Taptics`. If a task opens any other copy, including this OneDrive checkout, do not modify it; switch the tool working directory to `D:\Taptics`. Do not push and pull merely to transfer work between local copies unless the user explicitly requests it.
+
 ## Start here
 
 1. Read this file completely.
