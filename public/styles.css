@@ -227,22 +227,9 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .weapon-card > em { position: absolute; right: 5px; top: 6px; color: var(--muted); font: 700 7px var(--mono); font-style: normal; }
 .weapon-card .action-progress { position: absolute; left: 0; bottom: 0; height: 3px; width: 0; background: var(--orange); transition: width .12s; }
 .weapon-card.pending { border-color: var(--orange); animation: visual-commit .5s alternate infinite; }
-.commit-button { width: 100%; height: 66px; margin-top: 6px; border: 0; color: #11140b; background: var(--acid); cursor: pointer; position: relative; overflow: hidden; touch-action: manipulation; box-shadow: inset 0 -5px var(--acid-dark); }
-.commit-button small, .commit-button strong, .commit-button em { display: block; position: relative; z-index: 2; pointer-events: none; }
-.commit-button small { font: 700 6px var(--mono); letter-spacing: .13em; }
-.commit-button strong { font-size: 17px; margin: 2px 0; }
-.commit-button em { color: #526018; font: 700 7px var(--mono); font-style: normal; }
-.commit-button:active { transform: translateY(3px); box-shadow: inset 0 -2px var(--acid-dark); }
-.commit-button.locked { filter: grayscale(.7) brightness(.55); }
 .tap-ripple { position: absolute; width: 20px; height: 20px; border: 2px solid #33400b; border-radius: 50%; opacity: 0; transform: translate(-50%,-50%) scale(.2); pointer-events: none; }
 .tap-ripple.go { animation: ripple .35s ease-out; }
 @keyframes ripple { 0% { opacity: .65; transform: translate(-50%,-50%) scale(.2); } 100% { opacity: 0; transform: translate(-50%,-50%) scale(5); } }
-.commit-note { color: #747c88; text-align: center; font: 400 6px/1.4 var(--mono); margin: 5px 10px 0; }
-.own-status { display: grid; grid-template-columns: 72px 1fr 64px; align-items: center; gap: 8px; margin-top: 7px; padding: 7px 6px 0; border-top: 1px solid var(--line); }
-.own-status > div:last-child { text-align: right; }
-.own-status small, .own-status b { display: block; }
-.own-status small { color: var(--muted); font: 400 5px var(--mono); }
-.own-status b { font: 700 9px var(--mono); margin-top: 2px; }
 .core-meter.own i { background: var(--cyan); }
 
 /* Results */
@@ -401,14 +388,6 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 
 .action-card em, .weapon-card > em { right: 8px; top: 9px; font-size: .75rem; }
 .action-card .action-progress, .weapon-card .action-progress { height: 6px; }
 .action-card.pending::after { font-size: .5625rem; bottom: 8px; }
-.commit-button { min-height: 78px; height: auto; margin-top: 8px; padding: 9px; }
-.commit-button small { font-size: .75rem; }
-.commit-button strong { font-size: 1.2rem; margin-block: 4px; }
-.commit-button em { font-size: .75rem; }
-.commit-note { color: #aab3c0; font-size: .75rem; line-height: 1.55; margin: 8px 12px 0; }
-.own-status { grid-template-columns: 90px 1fr 80px; gap: 10px; margin-top: 10px; padding: 11px 6px 2px; }
-.own-status small { font-size: .75rem; }
-.own-status b { font-size: .8125rem; }
 
 /* Results and deck builder */
 .result-card { width: min(100%, 520px); padding: 30px 22px 22px; }
@@ -539,4 +518,128 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+}
+
+/* Battle focus pass: the battlefield owns the screen and actions happen on their lane. */
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
+.app-shell { width: min(100%, 720px); }
+.game { padding: max(10px, env(safe-area-inset-top)) 10px max(12px, env(safe-area-inset-bottom)); }
+.battle-header { height: 66px; grid-template-columns: 52px minmax(0,1fr) 88px; gap: 12px; }
+.back-button { width: 52px; height: 52px; font-size: 1.35rem; }
+.fighter-name span, .fighter > small, .meter-key, .clock small { font-size: .78rem; }
+.fighter-name b { font-size: .95rem; }
+.clock strong { font-size: 1.75rem; }
+.phase-banner { min-height: 60px; padding: 9px 13px; margin-bottom: 10px; }
+.phase-banner > span { font-size: 1.45rem; }
+.phase-banner b { font-size: .95rem; }
+.phase-banner small, .phase-banner p { font-size: .78rem; }
+
+.arena { height: clamp(460px, 58dvh, 600px); border-width: 2px; }
+.frontline { height: 30px; }
+.frontline span { font-size: .78rem; }
+.base { height: 44%; }
+.core { width: 102px; height: 88px; left: 43%; border-width: 3px; }
+.core span { font-size: .78rem; }
+.core b { font-size: 2rem; }
+.enemy-core { top: 18px; }
+.own-core { bottom: 18px; }
+.weapon-zone, .lane-zone { width: 78px; height: 78px; border-width: 3px; }
+.weapon-zone { left: 5%; }
+.enemy-base .weapon-zone, .enemy-base .lane-zone { top: 24px; }
+.own-base .weapon-zone, .own-base .lane-zone { bottom: 24px; }
+.weapon-label { font-size: 1.35rem; }
+.weapon-barrel { width: 52px; height: 14px; left: 34px; }
+.enemy-base .weapon-barrel { top: 52px; }
+.own-base .weapon-barrel { top: 8px; }
+.crew-zone { right: 22%; }
+.magic-zone { right: 3%; }
+.lane-zone > b { bottom: 5px; font-size: .72rem; }
+.crew-people { gap: 6px; margin-bottom: 13px; }
+.crew-people > i { width: 12px; height: 29px; }
+.crew-people > i::before { width: 12px; height: 12px; }
+.crew-people .scout { height: 25px; }
+.crew-people .builder { height: 32px; }
+.rune-mark { width: 53px; height: 53px; margin-bottom: 11px; }
+.wall { left: 18%; right: 3%; height: 38px; border-width: 2px; }
+.wall b { right: 9px; top: 8px; font-size: .82rem; }
+.structure-grid { left: 18%; right: 3%; height: 36px; gap: 5px; }
+.enemy-base .structure-grid { bottom: 53px; }
+.own-base .structure-grid { top: 53px; }
+.structure-tile { font-size: .7rem; }
+.weapon-zone .visual-load, .lane-zone .visual-load { height: 9px; bottom: -15px; }
+
+/* Selected cards create the actual tap target over their battlefield category. */
+.lane-commit { --action-color: var(--acid); --action-progress: 0; position: absolute; z-index: 12; bottom: 11px; width: 104px; min-height: 104px; border: 3px solid var(--action-color); background: linear-gradient(145deg,color-mix(in srgb,var(--action-color) 30%,#17202b),#0b1018 72%); color: var(--ink); box-shadow: 0 0 0 5px rgba(6,9,14,.82),0 10px 22px #000,0 0 24px color-mix(in srgb,var(--action-color) 42%,transparent); cursor: pointer; overflow: hidden; touch-action: manipulation; transition: left .2s,right .2s,border-color .15s,filter .15s,transform .1s; }
+.lane-commit.target-attack { left: calc(5% - 13px); right: auto; }
+.lane-commit.target-crew { left: auto; right: calc(22% - 13px); }
+.lane-commit.target-magic { left: auto; right: calc(3% - 13px); }
+.lane-commit::before { content: "TAP"; position: absolute; right: -3px; top: -5px; color: color-mix(in srgb,var(--action-color) 14%,transparent); font: 900 3.4rem/1 var(--mono); transform: rotate(-12deg); pointer-events: none; }
+.lane-commit .commit-icon { position: absolute; left: 8px; top: 8px; z-index: 2; display: grid; place-items: center; width: 34px; height: 34px; background: var(--action-color); color: #090d12; font: 900 .82rem var(--mono); }
+.lane-commit .commit-copy { position: absolute; z-index: 2; left: 8px; right: 8px; bottom: 23px; text-align: left; pointer-events: none; }
+.lane-commit .commit-copy small, .lane-commit .commit-copy strong { display: block; }
+.lane-commit .commit-copy small { color: var(--action-color); font: 800 .67rem var(--mono); letter-spacing: .07em; }
+.lane-commit .commit-copy strong { margin-top: 3px; font-size: .79rem; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane-commit > em { position: absolute; z-index: 2; top: 10px; right: 8px; color: #fff; font: 800 .78rem var(--mono); font-style: normal; }
+.lane-commit .commit-fill { position: absolute; z-index: 1; left: 0; bottom: 0; width: calc(var(--action-progress) * 100%); height: 12px; background: var(--action-color); box-shadow: 0 0 14px var(--action-color); transition: width .12s; }
+.lane-commit:active { transform: translateY(4px) scale(.98); }
+.lane-commit.locked { filter: grayscale(.45) brightness(.58); cursor: not-allowed; box-shadow: 0 0 0 5px rgba(6,9,14,.82),0 8px 18px #000; }
+.lane-commit:focus-visible { outline-offset: 7px; }
+
+/* Compact reserve HUD: one strong number, one meter, no extra vertical copy. */
+.compact-reserve { min-height: 58px; display: grid; grid-template-columns: 112px minmax(0,1fr); gap: 13px; align-items: center; margin-top: 9px; padding: 8px 12px; }
+.tap-count { display: flex; align-items: baseline; gap: 9px; border-right: 1px solid var(--line); }
+.tap-count small { color: var(--acid); font: 800 .75rem var(--mono); }
+.tap-count strong { font: 900 2rem/1 var(--mono); }
+.tap-count strong i { color: #707988; font-size: .72rem; font-style: normal; }
+.reserve-track { min-width: 0; }
+.reserve-meta { display: flex; flex-direction: row-reverse; justify-content: flex-end; align-items: baseline; gap: 7px; margin-bottom: 5px; }
+.reserve-meta b { color: var(--acid); font: 800 .78rem var(--mono); }
+.reserve-meta span { color: var(--muted); font: 700 .68rem var(--mono); }
+.compact-reserve .reserve-meter { height: 14px; margin: 0; }
+
+/* Cards show category by color, leaving only identity and cost as text. */
+.action-section { margin-top: 10px; }
+.action-section .section-label { padding: 0 4px 8px; font-size: .78rem; }
+.hand-row, .battle-hand { gap: 9px; }
+.hand-row { grid-template-columns: 3fr 1fr; }
+.action-card, .weapon-card { min-height: 96px; height: 96px; }
+.action-card { border: 2px solid var(--category-color,var(--line)); border-left-width: 8px; padding: 10px 9px 12px; background: linear-gradient(145deg,color-mix(in srgb,var(--category-color) 12%,#141b26),#0d121a); }
+.action-card.selected { border-color: var(--category-color); background: linear-gradient(145deg,color-mix(in srgb,var(--category-color) 24%,#17202a),#10151d); box-shadow: inset 0 0 20px color-mix(in srgb,var(--category-color) 13%,transparent),0 0 0 2px color-mix(in srgb,var(--category-color) 55%,transparent); transform: translateY(-3px); }
+.action-key { width: 34px; height: 34px; margin: 0 0 10px; font-size: .78rem; border-width: 2px; }
+.action-card.selected .action-key { background: var(--card-color); border-color: var(--card-color); }
+.action-card .action-name { display: block; max-width: calc(100% - 2px); font-size: .84rem; line-height: 1.05; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.action-card > em { right: 9px; top: 11px; color: #fff; font-size: .88rem; }
+.action-card > em small { color: var(--muted); font-size: .62rem; margin-left: 1px; }
+.action-card .action-progress, .weapon-card .action-progress { height: 8px; }
+.action-card.disabled { opacity: 1; filter: none; }
+.action-card.disabled > * { opacity: .16; }
+.action-card.disabled::after { content: attr(data-busy-label); inset: 13px 6px; display: grid; place-items: center; padding: 7px; border: 2px solid var(--category-color); background: rgba(7,10,16,.94); color: var(--category-color); font: 900 .72rem/1.25 var(--mono); letter-spacing: .05em; }
+.weapon-card.disabled::after { content: "ATTACK IS BUSY"; inset: 13px 5px; display: grid; place-items: center; border: 2px solid var(--orange); color: var(--orange); font-size: .68rem; }
+.weapon-card > span { width: 34px; height: 34px; font-size: .8rem; }
+.weapon-card div small { font-size: .68rem; }
+.weapon-card div b { font-size: .8rem; }
+.weapon-card > em { font-size: .85rem; }
+
+@media (max-height: 760px) {
+  .arena { height: 420px; }
+  .battle-header { height: 58px; }
+  .phase-banner { min-height: 52px; }
+}
+@media (max-width: 420px) {
+  .arena { height: clamp(430px, 57dvh, 520px); }
+  .weapon-zone, .lane-zone { width: 70px; height: 74px; }
+  .core { width: 92px; }
+  .lane-commit { width: 94px; min-height: 98px; }
+  .lane-commit.target-attack { left: calc(3% - 7px); }
+  .lane-commit.target-crew { right: calc(23% - 10px); }
+  .lane-commit.target-magic { right: calc(2% - 7px); }
+  .compact-reserve { grid-template-columns: 101px minmax(0,1fr); }
+  .tap-count { gap: 6px; }
+  .tap-count strong { font-size: 1.75rem; }
+}
+@media (max-width: 340px) {
+  .lane-commit { width: 88px; min-height: 94px; }
+  .action-card { border-left-width: 5px; padding-inline: 6px; }
+  .action-key { width: 30px; height: 30px; }
+  .compact-reserve { grid-template-columns: 92px minmax(0,1fr); }
 }

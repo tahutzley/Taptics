@@ -89,26 +89,23 @@
             <div id="own-crew" class="lane-zone crew-zone" aria-label="Your Crew commitment"><span class="crew-people"><i class="worker"></i><i class="scout"></i><i class="builder"></i></span><b>CREW</b><em class="visual-load"></em></div>
             <div id="own-magic" class="lane-zone magic-zone" aria-label="Your Magic commitment"><span class="rune-mark"></span><b>MAGIC</b><em class="visual-load"></em></div>
             <div id="own-structures" class="structure-grid" aria-label="Your structure tiles"></div>
+            <button id="commit-button" class="lane-commit target-crew" aria-label="Commit taps to selected card">
+              <span class="tap-ripple"></span><span class="commit-icon" id="commit-icon">--</span><span class="commit-copy"><small id="commit-lane">TAP CREW</small><strong id="commit-title">SELECT A CARD</strong></span><em id="commit-progress">0 / 0</em><i class="commit-fill"></i>
+            </button>
           </div>
           <div id="impact-flash" class="impact-flash"></div>
         </section>
 
-        <section class="reserve panel">
-          <div class="reserve-top"><div><small>YOUR TAP RESERVE</small><strong><span id="tap-value">10</span><i>/ 40</i></strong></div><div class="regen"><small>REGEN</small><b id="regen-value">+0.78/s</b></div></div>
-          <div class="reserve-meter"><i id="tap-bar"></i><span id="reserve-notches"></span></div>
-          <p id="reserve-hint" role="status" aria-live="polite">Spend before the reserve caps or regeneration is wasted.</p>
+        <section class="reserve compact-reserve panel" aria-label="Your tap reserve">
+          <div class="tap-count"><small>TAPS</small><strong><span id="tap-value">10</span><i>/40</i></strong></div>
+          <div class="reserve-track"><div class="reserve-meta"><b id="regen-value">+0.78/s</b><span>REGEN</span></div><div class="reserve-meter"><i id="tap-bar"></i><span id="reserve-notches"></span></div></div>
+          <p id="reserve-hint" role="status" aria-live="polite" class="sr-only">Spend before the reserve caps or regeneration is wasted.</p>
         </section>
 
         <section class="action-section">
           <div class="section-label"><span>THREE-CARD HAND</span><b id="next-card-label">NEXT: --</b></div>
           <div class="hand-row"><div id="battle-hand" class="battle-hand"></div><button id="weapon-card" class="weapon-card" data-source="weapon"><span id="weapon-short">C</span><div><small>WEAPON</small><b id="weapon-name">CANNON</b></div><em id="weapon-cost">8</em><i class="action-progress"></i></button></div>
-          <button id="commit-button" class="commit-button">
-            <span class="tap-ripple"></span><small>TAP TO COMMIT</small><strong id="commit-title">SELECT A CARD</strong><em id="commit-progress">0 / 0 TAPS</em>
-          </button>
-          <p class="commit-note" id="commit-note">Complete a card to play it and send it to the bottom of your six-card cycle.</p>
         </section>
-
-        <footer class="own-status"><div><small>YOUR CORE</small><b><span id="own-core-value">360</span> HP</b></div><div class="core-meter own"><i id="own-core-bar"></i></div><div><small>WALL</small><b><span id="own-wall-footer">35</span> HP</b></div></footer>
       </section>
     </main>
 

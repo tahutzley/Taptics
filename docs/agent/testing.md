@@ -42,7 +42,7 @@ Keep direct function tests deterministic by passing explicit timestamps. Use Soc
 | Server rule, timing, resource, card effect, or bot logic | Focused direct test plus full `npm test` |
 | Socket event or public state shape | Integration test plus full `npm test` |
 | Card/category/weapon data | Validation/effect test, builder inspection, full `npm test` |
-| Hand selection, lane disabling, or tap input | Existing source contract test, manual rapid switching while state updates, keyboard activation |
+| Hand selection, lane disabling, or lane-overlay tap input | Existing source contract test, manual rapid switching while state updates, keyboard activation |
 | Battlefield layout or cues | Phone-width and desktop-width visual inspection, both weapons, active/pending/siphon states |
 | Accessibility | Keyboard-only pass, 200% zoom/narrow reflow, focus visibility, reduced motion, live status behavior |
 | Documentation/context only | Link/path check, `git diff --check`, and `npm test` when instructions describe testable behavior |
@@ -50,8 +50,8 @@ Keep direct function tests deterministic by passing explicit timestamps. Use Soc
 ## Manual battle smoke pass
 
 1. Start a CPU match and confirm both sides begin with 10 taps.
-2. Rapidly switch among all three hand cards and the weapon while snapshots arrive; every press should select on the first attempt.
-3. Commit a card in each category and confirm only its category peers lock.
+2. Rapidly switch among all three hand cards and the weapon while snapshots arrive; every press should select on the first attempt and move the large action target to the correct battlefield category.
+3. Tap the battlefield action target to commit a card in each category and confirm only its category peers lock with a readable category-specific busy label.
 4. Confirm only the chosen weapon appears, Crew animates in the center, Magic animates on the right, and structures fill no more than eight slots.
 5. Siphon each enemy zone, checking pips, retreating progress, reserve transfer, and release at zero.
 6. Let a card complete and verify immediate hand replacement, correct next-card label, and completed-card rotation.

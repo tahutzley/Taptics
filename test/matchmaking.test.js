@@ -38,6 +38,7 @@ test("phase rules escalate toward an elimination endgame", () => {
 test("client keeps zoom and changing battle guidance accessible", () => {
   const html = readFileSync(join(__dirname, "..", "public", "index.html"), "utf8");
   const client = readFileSync(join(__dirname, "..", "public", "app.js"), "utf8");
+  const battleCardRenderer = client.match(/function cardButton[\s\S]*?function renderBattleHand/)?.[0] || "";
   assert.doesNotMatch(html, /user-scalable\s*=\s*no/i);
   assert.match(html, /id="reserve-hint" role="status" aria-live="polite"/);
   assert.match(html, /id="toast" class="toast hidden" role="status" aria-live="polite"/);
@@ -45,8 +46,15 @@ test("client keeps zoom and changing battle guidance accessible", () => {
   assert.match(html, /id="own-crew"/);
   assert.match(html, /id="own-magic"/);
   assert.doesNotMatch(html, /id="own-(?:cannon|volley)"/);
+  assert.match(html, /class="base own-base"[\s\S]*id="commit-button" class="lane-commit/);
+  assert.doesNotMatch(html, /class="(?:commit-note|own-status)"|id="own-(?:core-value|core-bar|wall-footer)"/);
   assert.match(client, /hand\.dataset\.signature !== handSignature/);
   assert.match(client, /#battle-hand"\)\.addEventListener\("pointerdown", selectHandCard\)/);
+  assert.match(client, /data-busy-label="\$\{category\.name\.toUpperCase\(\)\} IS BUSY"/);
+  assert.match(client, /button\.className = `lane-commit target-\$\{categoryKey\}/);
+  assert.match(client, /#commit-button"\)\.addEventListener\("click", activateCommit\)/);
+  assert.match(client, /#commit-button"\)\.addEventListener\("keydown", activateCommitKey\)/);
+  assert.doesNotMatch(battleCardRenderer, /card\.type\.toUpperCase\(\)/);
   assert.doesNotMatch(client, /data-hand-slot[^\n]+addEventListener/);
 });
 

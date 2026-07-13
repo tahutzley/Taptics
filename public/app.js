@@ -206,7 +206,7 @@ function cardButton(key, slot, player) {
   const selected = selectedTarget.source === "card" && selectedTarget.slot === slot;
   const pending = player.pending.some(job => job.source === "card" && job.key === key);
   const category = DATA.categories[card.category];
-  return `<button class="action-card battle-card category-${card.category} ${selected ? "selected" : ""} ${pending ? "pending" : ""}" data-hand-slot="${slot}" style="--card-color:${card.color};--category-color:${category.color}"><span class="action-key" style="background:${selected ? card.color : ""};border-color:${card.color}">${card.short}</span><div><b>${card.name}</b><small>${category.name.toUpperCase()} · ${card.type.toUpperCase()}</small></div><em>${card.cost}</em><i class="action-progress" style="width:${progress / card.cost * 100}%;background:${card.color}"></i></button>`;
+  return `<button class="action-card battle-card category-${card.category} ${selected ? "selected" : ""} ${pending ? "pending" : ""}" data-hand-slot="${slot}" data-busy-label="${category.name.toUpperCase()} IS BUSY" style="--card-color:${card.color};--category-color:${category.color}"><span class="action-key" style="border-color:${card.color}">${card.short}</span><b class="action-name">${card.name}</b><em>${card.cost}<small>T</small></em><i class="action-progress" style="width:${progress / card.cost * 100}%;background:${category.color}"></i></button>`;
 }
 function renderBattleHand() {
   const player = me();
@@ -229,6 +229,7 @@ function renderBattleHand() {
     button.classList.toggle("disabled", blocked);
     button.disabled = blocked;
     button.setAttribute("aria-disabled", String(blocked));
+    button.dataset.busyLabel = `${DATA.categories[card.category].name.toUpperCase()} IS BUSY`;
     button.querySelector(".action-key").style.background = selected ? card.color : "";
     button.querySelector(".action-progress").style.width = `${(player.cardProgress[key] || 0) / card.cost * 100}%`;
   });
@@ -252,10 +253,20 @@ function renderActionControls() {
   const definition = definitionForTarget(player);
   if (!definition) return;
   const progress = targetProgress(player);
-  $("#commit-title").textContent = selectedTarget.source === "weapon" ? `LOAD ${definition.name.toUpperCase()}` : `PLAY ${definition.name.toUpperCase()}`;
-  $("#commit-progress").textContent = `${progress} / ${definition.cost} TAPS`;
-  $("#commit-note").textContent = definition.description;
-  $("#commit-button").classList.toggle("locked", targetBlocked(player));
+  const categoryKey = selectedTarget.source === "weapon" ? "attack" : definition.category;
+  const category = DATA.categories[categoryKey];
+  const button = $("#commit-button");
+  const blocked = targetBlocked(player);
+  button.className = `lane-commit target-${categoryKey} category-${categoryKey}${blocked ? " locked" : ""}`;
+  button.style.setProperty("--action-color", definition.color);
+  button.style.setProperty("--action-progress", progress / definition.cost);
+  button.disabled = blocked;
+  button.setAttribute("aria-label", `${blocked ? "Cannot use" : "Tap to use"} ${definition.name}. ${progress} of ${definition.cost} taps committed.`);
+  $("#commit-icon").textContent = definition.short;
+  const laneBusy = laneBlocked(player, selectedTarget.source, keyForTarget(player));
+  $("#commit-lane").textContent = targetPending(player) ? "WINDING UP" : laneBusy ? `${category.name.toUpperCase()} BUSY` : player.taps < 1 ? "WAIT FOR TAPS" : `TAP ${category.name.toUpperCase()}`;
+  $("#commit-title").textContent = definition.name.toUpperCase();
+  $("#commit-progress").textContent = `${progress}/${definition.cost}`;
 }
 
 function renderStructures(prefix, player) {
@@ -398,11 +409,9 @@ function render(state) {
   const enemy = rival();
   renderPhase(state.phase);
   $("#timer").textContent = formatTime(state.elapsed);
-  $("#own-core-value").textContent = Math.ceil(player.coreHp);
   $("#own-core-board").textContent = Math.ceil(player.coreHp);
   $("#enemy-core-value").textContent = Math.ceil(enemy.coreHp);
   $("#enemy-core-board").textContent = Math.ceil(enemy.coreHp);
-  $("#own-core-bar").style.width = `${player.coreHp / 360 * 100}%`;
   $("#enemy-core-bar").style.width = `${enemy.coreHp / 360 * 100}%`;
   $("#tap-value").textContent = Math.floor(player.taps);
   $("#tap-bar").style.width = `${player.taps / 40 * 100}%`;
@@ -411,7 +420,6 @@ function render(state) {
   $("#regen-value").textContent = `+${regen.toFixed(2)}/s`;
   const enemyHasProject = ["attack", "crew", "magic"].some(category => siphonTarget(enemy, player, category));
   $("#reserve-hint").textContent = player.taps >= 39.8 ? "RESERVE CAPPED - regeneration is being wasted." : enemyHasProject ? "Purple target: tap the rival project 3 times to siphon its progress." : player.taps < 3 ? "Low reserve. Your hand is narrowing." : "Complete a card to rotate the next card into its hand slot.";
-  $("#own-wall-footer").textContent = `${Math.ceil(player.wallHp)}${player.shield ? ` + ${Math.ceil(player.shield)}S` : ""}`;
   renderWall("own", player);
   renderWall("enemy", enemy);
   renderStructures("own", player);
@@ -437,6 +445,16 @@ function commitTap(event) {
   ripple.classList.add("go");
   tone(320 + targetProgress(player) * 18, .025, "sine", .018);
   socket.emit("action", { type: "tap", source: selectedTarget.source, key: keyForTarget(player) });
+}
+function activateCommit(event) {
+  if (event.type === "click" && event.detail !== 0) return;
+  event.preventDefault();
+  commitTap(event);
+}
+function activateCommitKey(event) {
+  if (event.repeat || (event.key !== "Enter" && event.key !== " ")) return;
+  event.preventDefault();
+  commitTap(event);
 }
 function selectHandCard(event) {
   const button = event.target.closest("[data-hand-slot]");
@@ -539,7 +557,9 @@ $("#battle-hand").addEventListener("pointerdown", selectHandCard);
 $("#battle-hand").addEventListener("click", selectHandCard);
 $("#weapon-card").addEventListener("pointerdown", selectWeapon);
 $("#weapon-card").addEventListener("click", selectWeapon);
-$("#commit-button").addEventListener("pointerdown", event => { event.preventDefault(); commitTap(event); });
+$("#commit-button").addEventListener("pointerdown", activateCommit);
+$("#commit-button").addEventListener("click", activateCommit);
+$("#commit-button").addEventListener("keydown", activateCommitKey);
 for (const zone of ["weapon", "crew", "magic"]) $("#enemy-" + zone).addEventListener("pointerdown", siphonTap);
 $("#leave-battle").addEventListener("click", () => { socket.emit("leaveMatch"); showLobby(); });
 $("#lobby-button").addEventListener("click", () => {

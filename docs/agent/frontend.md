@@ -5,7 +5,7 @@ The browser client is mobile-first, dependency-free HTML/CSS/JavaScript. It rend
 ## Screens and ownership
 
 - Lobby: profile record, matchmaking, saved six-card cycle, weapon, field challenge, and phase explanation.
-- Battle: enemy village, shared field, own village, reserve, three-card hand, permanent weapon, and one large commit control.
+- Battle: enemy village, shared field, own village, compact reserve, three-card hand, permanent weapon, and a selected action target positioned directly over its battlefield category.
 - Deck modal: choose exactly six unique cards and one permanent weapon.
 - Result modal: outcome, performance stats, tactical read, rematch, and lobby return.
 
@@ -22,6 +22,8 @@ Each village uses the same readable zones:
 5. Eight visible structure tiles for built structures.
 6. A core with persistent HP.
 
+The arena is the dominant battle surface. Core and Wall values live on their battlefield objects rather than in a duplicate footer. The compact reserve HUD keeps the tap count prominent without competing with the arena.
+
 `renderProjectCues()` applies normalized loading, pending, and siphon states to the three category zones. Rival intent should be legible from animation, fill, glow, pending state, and counterability; explanatory text may support accessibility but should not become the primary visual signal.
 
 ## Selection and input contract
@@ -32,8 +34,9 @@ The hand-selection bug is guarded by a specific architecture:
 - `renderBattleHand()` computes a hand signature. It rebuilds hand markup only when card keys/order change, then updates selected, pending, disabled, and progress states in place on ordinary snapshots.
 - `pointerdown` selects immediately on touch/mouse. A `click` listener handles keyboard and assistive activation only; mouse-generated clicks are filtered with `event.detail` to avoid duplicate selection.
 - The permanent weapon uses the same paired input approach.
-- The large `#commit-button` spends on the currently selected target; selecting a card never spends a tap.
+- Selecting a card moves `#commit-button` over its own Attack, Crew, or Magic zone. The overlay adopts that card's icon, name, color, cost, and progress; tapping this battlefield element spends on the selected target. Selecting a card never spends a tap.
 - Lane-disabled cards use both native `disabled` and `aria-disabled`. Selection state must stay visually distinct from disabled/pending state.
+- Battle cards show category through color rather than repeated category/type copy. A blocked card receives a high-contrast `ATTACK/CREW/MAGIC IS BUSY` label over the card.
 
 Do not call `renderBattleHand()` in a way that replaces the button under an active pointer unless the actual hand cycled. Do not attach listeners inside `cardButton()` or after every state snapshot.
 
@@ -50,7 +53,7 @@ Do not call `renderBattleHand()` in a way that replaces the button under an acti
 - Keep the viewport scalable; never add `user-scalable=no` or a restrictive maximum scale.
 - Primary interactive targets should remain at least 48px. Tactical text should normally remain 12px or larger, with body copy around 14-16px.
 - Preserve strong contrast, non-color state differences, and a visible `:focus-visible` treatment.
-- Keep live status regions for changing reserve guidance and toasts.
+- Keep live status regions for changing reserve guidance and toasts. Compact or visually hidden guidance must remain available to assistive technology.
 - Respect `prefers-reduced-motion`; important state must remain understandable without animation.
 - Narrow layouts must reflow instead of horizontally clipping cards, records, phase information, or controls.
 - Any purely visual cue needs an accessible label or equivalent state exposed to assistive technology.

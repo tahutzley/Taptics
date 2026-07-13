@@ -23,6 +23,7 @@ Open `http://localhost:3000`. **Play CPU** starts an authoritative server-simula
 - Only the chosen permanent weapon appears on the battlefield. It occupies the left-side Attack zone.
 - Cards belong to **Attack**, **Crew**, or **Magic**. Each category has one commitment lane, so a second card in that category is disabled while another is unfinished or activating.
 - The permanent weapon shares the Attack lane with Attack cards. Crew commitments animate the villagers; Magic commitments animate the rune circle.
+- Selecting a hand card places its card-colored tap target directly over the matching Attack, Crew, or Magic battlefield zone; there is no detached bottom tap button.
 - Constructed cards fill one of eight visible village structure tiles. A ninth structure cannot be built.
 - Destroying a wall salvages 4 taps for its owner, preserving a defensive decision after a breach.
 - Partial commitments, tap reserves, and action wind-ups are visible to both players.
@@ -66,6 +67,7 @@ The CPU has several complete decks and strategic plans but follows the same hand
 
 - Body copy is set at 14-16px, with meaningful tactical labels kept at 12px or larger instead of the original 5-9px microtype.
 - Primary controls use at least 48px touch areas, exceeding the WCAG 2.2 AA 24px minimum and aligning with mobile platform guidance for comfortably tappable controls.
+- The enlarged arena carries core, Wall, intent, and action state directly; the compact reserve HUD and simplified color-coded hand remove duplicate bottom readouts.
 - Browser zoom and text enlargement are not disabled. At very narrow effective widths, records, decks, cards, and phase information reflow instead of being clipped.
 - Keyboard focus uses a high-contrast visible outline, changing reserve guidance is announced as a live status, and reduced-motion preferences remain supported.
 
