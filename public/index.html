@@ -60,25 +60,58 @@
 
       <section id="deck-screen" class="deck-screen screen hidden" aria-labelledby="deck-builder-title">
         <section class="deck-builder-modal">
-          <header class="deck-screen-header"><div><p class="eyebrow"><span></span> QUARTERMASTER'S TABLE</p><h2 id="deck-builder-title" tabindex="-1">BUILD YOUR DECK</h2></div></header>
-          <p class="deck-builder-copy">Choose six unique cards in exact draw order, then arm one permanent weapon. Battles always use the last saved loadout.</p>
-          <div id="deck-status" class="deck-status pixel-panel"></div>
-          <button id="restore-deck" class="restore-deck pixel-button hidden" type="button">RESTORE SAVED LOADOUT</button>
+          <header class="deck-screen-header">
+            <div><p class="eyebrow"><span></span> QUARTERMASTER'S TABLE</p><h2 id="deck-builder-title" tabindex="-1">BUILD YOUR DECK</h2></div>
+            <div id="deck-status" class="deck-status pixel-panel" data-state="saved"><span class="deck-status__emblem" aria-hidden="true">&#10003;</span><span id="deck-status-copy">Deck 1 is auto-saved and ready for battle.</span></div>
+          </header>
+          <nav class="deck-switcher pixel-panel" aria-labelledby="deck-switcher-label">
+            <div class="deck-switcher__heading"><span id="deck-switcher-label">YOUR DECKS</span><b>5 LOADOUTS</b></div>
+            <div id="deck-tabs" class="deck-tabs" role="tablist" aria-label="Choose a deck to edit and use in battle">
+              <button type="button" role="tab" data-deck-tab="0" aria-controls="deck-editor" aria-selected="true"><b>DECK 1</b><small>ACTIVE</small></button>
+              <button type="button" role="tab" data-deck-tab="1" aria-controls="deck-editor" aria-selected="false"><b>DECK 2</b><small>READY</small></button>
+              <button type="button" role="tab" data-deck-tab="2" aria-controls="deck-editor" aria-selected="false"><b>DECK 3</b><small>READY</small></button>
+              <button type="button" role="tab" data-deck-tab="3" aria-controls="deck-editor" aria-selected="false"><b>DECK 4</b><small>READY</small></button>
+              <button type="button" role="tab" data-deck-tab="4" aria-controls="deck-editor" aria-selected="false"><b>DECK 5</b><small>READY</small></button>
+            </div>
+          </nav>
+          <aside id="deck-hint" class="deck-hint pixel-panel" aria-label="Deck builder guidance">
+            <p id="deck-help">Tap any card to reveal Info and Choose Position or Remove. Hold a deck card to reorder it. Every edit saves automatically.</p>
+            <button id="dismiss-deck-hint" class="pixel-button" type="button" aria-label="Dismiss deck builder guidance">GOT IT</button>
+          </aside>
           <span id="deck-announcer" class="sr-only" role="status" aria-live="polite"></span>
 
-          <section class="weapon-builder pixel-panel" aria-labelledby="weapon-builder-title"><div class="section-label"><span id="weapon-builder-title">PERMANENT WEAPON</span><b>ALWAYS AVAILABLE</b></div><div id="weapon-options" class="weapon-options" role="group" aria-label="Choose one permanent weapon"></div></section>
+          <section class="weapon-builder deck-workbench pixel-panel" aria-labelledby="weapon-builder-title"><div class="section-label"><span id="weapon-builder-title">PERMANENT WEAPON</span><b>ALWAYS AVAILABLE</b></div><div id="weapon-options" class="weapon-options" role="radiogroup" aria-label="Choose one permanent weapon"></div></section>
 
-          <section class="builder-selection pixel-panel" aria-labelledby="builder-selection-title"><div class="section-label"><span id="builder-selection-title">SIX-CARD DRAW ORDER</span><b id="builder-count">6 / 6</b></div><div id="builder-deck" class="builder-deck" role="list" aria-label="Selected cards in draw order"></div></section>
-
-          <section id="deck-details" class="deck-details pixel-panel" aria-labelledby="deck-detail-name">
-            <div id="deck-detail-frame" class="deck-detail-frame" aria-hidden="true"></div>
-            <div class="deck-detail-copy"><small id="deck-detail-category">CARD DETAILS</small><h3 id="deck-detail-name">SELECT A CARD</h3><p id="deck-detail-description">Choose a card in the library or your draw order to inspect its rules.</p><div id="deck-detail-stats" class="deck-detail-stats"></div></div>
-            <button id="deck-detail-toggle" class="deck-detail-toggle pixel-button" type="button" disabled>SELECT A CARD</button>
+          <section id="deck-editor" class="builder-selection deck-workbench pixel-panel" role="tabpanel" aria-labelledby="builder-selection-title">
+            <div class="section-label"><span id="builder-selection-title">YOUR DRAW ORDER</span><b id="builder-count">6 / 6 READY</b></div>
+            <div id="builder-deck" class="builder-deck" role="group" aria-label="Selected cards in draw order" aria-describedby="deck-help"></div>
+            <div id="deck-summary" class="deck-summary" aria-label="Deck summary">
+              <div class="deck-summary__cost"><small>AVERAGE TAPS</small><strong id="deck-average-cost">0.0</strong></div>
+              <div class="deck-summary__category category-attack"><small>ATTACK</small><strong id="deck-attack-count">0</strong></div>
+              <div class="deck-summary__category category-crew"><small>CREW</small><strong id="deck-crew-count">0</strong></div>
+              <div class="deck-summary__category category-magic"><small>MAGIC</small><strong id="deck-magic-count">0</strong></div>
+              <div class="deck-summary__readiness"><small>LOADOUT</small><strong id="deck-readiness">6 / 6 READY</strong></div>
+            </div>
           </section>
 
-          <button id="save-deck" class="primary-cta save-loadout pixel-button"><span>SAVE LOADOUT</span><small>Use this exact order in CPU and online battles</small><i aria-hidden="true">&#10003;</i></button>
+          <section class="deck-history pixel-panel" aria-label="Deck edit history">
+            <div id="deck-undo" class="deck-undo hidden"><span id="deck-undo-copy">Last edit ready to undo.</span><button id="undo-deck-edit" class="pixel-button" type="button">UNDO</button></div>
+          </section>
 
-          <section class="card-library-wrap" aria-labelledby="library-title"><div class="section-label"><span id="library-title">CARD ARMORY</span><b id="library-count">29 CARDS</b></div><div id="deck-filters" class="deck-filters" role="group" aria-label="Filter cards by category"><button type="button" data-deck-filter="all" aria-pressed="true">ALL</button><button type="button" data-deck-filter="attack" aria-pressed="false">ATTACK</button><button type="button" data-deck-filter="crew" aria-pressed="false">CREW</button><button type="button" data-deck-filter="magic" aria-pressed="false">MAGIC</button></div><div id="card-library" class="card-library" aria-label="Card library"></div></section>
+          <section class="card-library-wrap" aria-labelledby="library-title">
+            <div class="section-label armory-heading"><span id="library-title">CARD ARMORY</span><b id="library-count">29 CARDS</b></div>
+            <div id="armory-toolbar" class="armory-toolbar pixel-panel">
+              <div class="armory-search">
+                <label for="deck-search">SEARCH BY CARD NAME</label>
+                <div><input id="deck-search" type="search" autocomplete="off" spellcheck="false" placeholder="Search 29 cards" /><button id="clear-deck-search" class="pixel-button hidden" type="button">CLEAR</button></div>
+              </div>
+              <div id="deck-filters" class="deck-filters" role="group" aria-label="Filter cards by category"><button type="button" data-deck-filter="all" aria-pressed="true">ALL</button><button type="button" data-deck-filter="attack" aria-pressed="false">ATTACK</button><button type="button" data-deck-filter="crew" aria-pressed="false">CREW</button><button type="button" data-deck-filter="magic" aria-pressed="false">MAGIC</button></div>
+              <label class="armory-sort" for="deck-sort"><span>SORT</span><select id="deck-sort"><option value="recommended">RECOMMENDED</option><option value="cost-asc">TAP COST: LOW TO HIGH</option><option value="cost-desc">TAP COST: HIGH TO LOW</option><option value="name">NAME</option></select></label>
+              <button id="reset-deck-filters" class="reset-deck-filters pixel-button" type="button">RESET FILTERS</button>
+            </div>
+            <div id="armory-no-results" class="armory-no-results pixel-panel hidden"><strong>NO CARDS MATCH THESE FILTERS.</strong><button id="clear-empty-armory" class="pixel-button" type="button">CLEAR FILTERS</button></div>
+            <div id="card-library" class="card-library" aria-label="Card library"></div>
+          </section>
         </section>
       </section>
 
@@ -86,6 +119,7 @@
         <button id="battle-tab" class="lobby-tab pixel-tab active" type="button" aria-current="page"><span class="pixel-sprite pixel-nav-battle" aria-hidden="true"></span><b>BATTLE</b></button>
         <button id="open-deck" class="lobby-tab pixel-tab" type="button"><span class="pixel-sprite pixel-nav-deck" aria-hidden="true"></span><b>DECK</b></button>
         <button class="lobby-tab pixel-tab disabled" type="button" disabled aria-disabled="true" aria-label="Challenges locked, coming soon"><span class="pixel-sprite pixel-nav-challenge" aria-hidden="true"></span><b>CHALLENGES</b><small>LOCKED</small></button>
+        <span class="lobby-tabs__marker" aria-hidden="true"></span>
       </nav>
 
       <section id="game" class="game screen hidden">
@@ -139,6 +173,32 @@
         </section>
       </section>
     </main>
+
+    <div id="deck-info-modal" class="modal deck-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="deck-info-name" aria-describedby="deck-info-description deck-info-membership">
+      <section class="deck-info-sheet pixel-modal-frame">
+        <button id="close-deck-info" class="deck-sheet-close pixel-button" type="button" aria-label="Close card information">&times;</button>
+        <div class="deck-info-portrait"><span id="deck-info-art" class="pixel-sprite pixel-portrait-fallback" aria-hidden="true"><b id="deck-info-short">--</b></span></div>
+        <div class="deck-info-copy">
+          <p id="deck-info-category" class="eyebrow"><span></span> CARD INFORMATION</p>
+          <h2 id="deck-info-name" tabindex="-1">CARD NAME</h2>
+          <p id="deck-info-meta">CATEGORY / TYPE</p>
+          <strong id="deck-info-cost" class="deck-info-cost">0 TAPS</strong>
+          <p id="deck-info-description">Card description.</p>
+          <div id="deck-info-stats" class="deck-info-stats" role="list" aria-label="Card statistics"></div>
+          <p id="deck-info-membership">Not currently in your draw order.</p>
+        </div>
+      </section>
+    </div>
+
+    <div id="deck-replace-modal" class="modal deck-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="deck-replace-title" aria-describedby="deck-replace-copy">
+      <section class="deck-replacement-sheet pixel-modal-frame">
+        <p class="eyebrow"><span></span> DIRECT REPLACEMENT</p>
+        <h2 id="deck-replace-title" tabindex="-1">CHOOSE A CARD TO REPLACE</h2>
+        <p id="deck-replace-copy">Choose one draw position for the incoming card.</p>
+        <div id="deck-replacement-options" class="deck-replacement-options" role="list" aria-label="Current draw order"></div>
+        <button id="cancel-replacement-sheet" class="secondary-cta pixel-button" type="button">CANCEL</button>
+      </section>
+    </div>
 
     <div id="leave-modal" class="modal lifecycle-modal hidden" role="dialog" aria-modal="true" aria-labelledby="leave-title" aria-describedby="leave-copy">
       <section class="confirmation-card pixel-modal-frame">

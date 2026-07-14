@@ -122,10 +122,14 @@ async function run() {
       await page.evaluate(({ raw, value }) => localStorage.setItem("taptics-prototype-v3", raw ?? JSON.stringify(value)), fixture);
       await page.reload({ waitUntil: "networkidle" });
       const migrated = await page.evaluate(() => JSON.parse(localStorage.getItem("taptics-prototype-v3")));
-      assert.deepEqual(migrated.deck, fixture.expectedDeck, `${fixture.name} deck migration`);
-      assert.equal(migrated.weapon, fixture.expectedWeapon, `${fixture.name} weapon migration`);
-      assert.equal(migrated.version, 5, `${fixture.name} profile version`);
-      if (Object.hasOwn(fixture, "expectedDraft")) assert.deepEqual(migrated.deckDraft, fixture.expectedDraft, `${fixture.name} draft migration`);
+      assert.equal(migrated.version, 6, `${fixture.name} profile version`);
+      assert.equal(migrated.loadouts.length, 5, `${fixture.name} must normalize exactly five loadout records`);
+      assert.deepEqual(migrated.loadouts[0].deck, fixture.expectedDeck, `${fixture.name} deck migration`);
+      assert.equal(migrated.loadouts[0].weapon, fixture.expectedWeapon, `${fixture.name} weapon migration`);
+      assert.deepEqual(migrated.loadouts.slice(1).map(loadout => loadout.deck), Array.from({ length: 4 }, () => catalogue.deck), `${fixture.name} must seed the other four deck slots safely`);
+      if (Object.hasOwn(fixture, "expectedDraft")) assert.deepEqual(migrated.loadouts[0].deckDraft, fixture.expectedDraft, `${fixture.name} draft migration`);
+      assert.deepEqual([migrated.activeDeck, migrated.selectedDeck], [0, 0], `${fixture.name} must select the migrated first deck`);
+      assert.equal(Object.hasOwn(migrated, "deck") || Object.hasOwn(migrated, "weapon") || Object.hasOwn(migrated, "deckDraft"), false, `${fixture.name} must remove legacy top-level loadout fields`);
       if (!fixture.resetStats) assert.deepEqual([migrated.duels, migrated.wins, migrated.challenge], [7, 3, 1], `${fixture.name} must preserve progression`);
       else assert.deepEqual([migrated.duels, migrated.wins, migrated.challenge], [0, 0, 0], `${fixture.name} must reset malformed progression`);
     }
@@ -157,36 +161,83 @@ async function run() {
     await assertVisible(page, "#deck-screen");
     assert.equal(await page.locator("#builder-deck [data-deck-slot]").count(), 6, "Deck must keep six stable slot roots");
     assert.equal(await page.locator("#card-library [data-library-card]").count(), 29, "Deck must expose all 29 catalogue cards");
-    assert.equal(await page.locator("#weapon-options [data-weapon]").count(), 2, "Deck must expose both illustrated weapons");
+    assert.equal(await page.locator("#weapon-options [data-weapon-root]").count(), 2, "Deck must expose both stable illustrated weapon roots");
+    assert.equal(await page.locator("#deck-tabs [data-deck-tab]").count(), 5, "Deck must expose five switchable saved loadouts");
+    assert.equal(await page.locator('#deck-tabs [role="tab"][aria-selected="true"]').count(), 1, "Deck tabs must expose one selected editor");
+    assert.equal(await page.locator("#deck-info-modal").count(), 1, "Deck Info must remain bounded to one reusable dialog");
+    assert.equal(await page.locator("#deck-replace-modal").count(), 1, "collection-first replacement must remain bounded to one reusable sheet");
     await assertFocusRing(page, '[data-weapon="cannon"]', "selected Deck weapon");
-    assert.equal(await page.locator("#deck-details").count(), 1, "Deck details must remain bounded to one surface");
-    assert.equal(await page.locator('[data-deck-slot="0"] [data-slot-action="left"]').isEnabled(), false, "first card cannot move left");
-    assert.equal(await page.locator('[data-deck-slot="5"] [data-slot-action="right"]').isEnabled(), false, "last card cannot move right");
-    assert.equal(await page.evaluate(() => Boolean(document.querySelector("#save-deck").compareDocumentPosition(document.querySelector("#card-library")) & Node.DOCUMENT_POSITION_FOLLOWING)), true, "Save must remain above the long library");
-    await page.evaluate(() => { window.__deckRootRefs = { slots: [...document.querySelectorAll("[data-deck-slot]")], cards: [...document.querySelectorAll("[data-library-card]")], details: document.querySelector("#deck-details") }; });
+    assert.equal(await page.locator('[data-slot-action="left"], [data-slot-action="right"]').count(), 0, "retired reorder arrows must stay absent");
+    assert.equal(await page.locator('[data-slot-action="drag"], .deck-slot__drag-handle').count(), 0, "Deck reorder must use the card surface without exposing a separate drag control");
+    assert.equal(await page.locator('#builder-deck [data-slot-action="remove"]:visible').count(), 0, "Remove must remain contextual until a deck position is selected");
+    assert.equal(await page.locator('#card-library [data-card-action="info"]:visible, #card-library [data-card-action="choose"]:visible, #card-library [data-card-action="locate"]:visible').count(), 0, "Armory actions must stay collapsed until a card is selected");
+    assert.equal(await page.locator('#weapon-options [role="radio"][aria-checked="true"]').count(), 1, "weapons must expose one checked radio choice");
+    assert.equal(await page.locator("#save-deck, #restore-deck, #deck-save-rail").count(), 0, "Deck changes must auto-save without Save or Restore controls");
+    assert.deepEqual(await page.locator("#builder-deck .deck-slot-order").allTextContents(), ["#1", "#2", "#3", "#4", "#5", "#6"], "draw order labels must include a # prefix");
+    const weaponStats = await page.locator("#weapon-options .weapon-option__strengths b").allTextContents();
+    assert.ok(weaponStats.length >= 4 && weaponStats.every(Boolean), "both permanent weapons must expose basic stats");
+    await rememberDeckRoots(page);
 
     for (const [width, height] of RELEASE_VIEWPORTS) {
-      await page.setViewportSize({ width, height });
-      const deckLayout = await page.evaluate(() => ({
-        horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth || document.querySelector("#deck-screen").scrollWidth > document.querySelector("#deck-screen").clientWidth,
-        actionCount: [...document.querySelectorAll("#deck-screen button:not([disabled])")].filter(element => element.getClientRects().length).length,
-        clippedActions: [...document.querySelectorAll("#deck-screen button:not([disabled])")].filter(element => element.getClientRects().length).filter(element => { const rect = element.getBoundingClientRect(); return rect.left < -1 || rect.right > innerWidth + 1; }).length,
-        smallestAction: Math.min(...[...document.querySelectorAll("#deck-screen button:not([disabled])")].filter(element => element.getClientRects().length).map(element => Math.min(element.getBoundingClientRect().width, element.getBoundingClientRect().height))),
-        illustratedCards: [...document.querySelectorAll("#card-library .card-frame__art")].every(element => getComputedStyle(element).backgroundImage.includes("cards-atlas.png")),
-        illustratedWeapons: [...document.querySelectorAll("#weapon-options .card-frame__art")].every(element => getComputedStyle(element).backgroundImage.includes("weapons-atlas.png"))
+      const expectedColumns = width < 480 ? 2 : width < 800 ? 3 : 4;
+      const deckLayout = await auditDeckLayout(page, width, height, expectedColumns, path.join(ARTIFACTS, `phase-05-deck-${width}x${height}.png`));
+      const illustrated = await page.evaluate(() => ({
+        cards: [...document.querySelectorAll("#card-library .card-frame__art")].every(element => getComputedStyle(element).backgroundImage.includes("cards-atlas.png")),
+        weapons: [...document.querySelectorAll("#weapon-options .card-frame__art")].every(element => getComputedStyle(element).backgroundImage.includes("weapons-atlas.png"))
       }));
-      assert.equal(deckLayout.horizontalOverflow, false, `${width}px Deck must not clip horizontally`);
-      assert.ok(deckLayout.actionCount > 0, "Deck must retain reachable actions");
-      assert.equal(deckLayout.clippedActions, 0, `${width}px Deck actions must remain in the viewport`);
-      assert.ok(deckLayout.smallestAction >= 48, `${width}px Deck actions must retain 48px targets`);
-      assert.equal(deckLayout.illustratedCards, true, "all Deck cards must use catalogue portraits");
-      assert.equal(deckLayout.illustratedWeapons, true, "both Deck weapons must use catalogue portraits");
-      await page.screenshot({ path: path.join(ARTIFACTS, `phase-05-deck-${width}x${height}.png`) });
+      assert.deepEqual(illustrated, { cards: true, weapons: true }, "Deck cards and weapons must use catalogue portraits");
+      assert.equal(deckLayout.columns, expectedColumns);
     }
+    await page.setViewportSize({ width: 390, height: 844 });
+    await exerciseDeckInfoCoverage(page);
+    await assertDeckRootsStable(page, "Info inspection must not replace stable Deck roots");
+    await exerciseArmoryMotion(page);
+    await assertDeckRootsStable(page, "animated and rapid Armory filtering must preserve stable catalogue roots");
+
+    assert.deepEqual(await page.evaluate(() => Object.fromEntries(["attack", "crew", "magic"].map(category => [category, document.querySelector(`[data-armory-group-count="${category}"]`).textContent]))), { attack: "- 6", crew: "- 14", magic: "- 9" }, "All must expose labeled category group counts");
+    await page.locator("#deck-search").focus();
+    await page.locator("#deck-search").fill("ward");
+    await page.waitForFunction(() => document.querySelectorAll("#card-library [data-library-card]:not([hidden])").length === 1);
+    assert.equal(await page.evaluate(() => document.activeElement?.id), "deck-search", "search updates must preserve keyboard focus");
+    assert.equal(await page.locator("#clear-deck-search").isVisible(), true, "search text must expose a Clear action");
+    await page.locator("#clear-deck-search").click();
+    await page.waitForFunction(() => document.querySelectorAll("#card-library [data-library-card]:not([hidden])").length === 29);
+    assert.equal(await page.evaluate(() => document.activeElement?.id), "deck-search", "clearing search must return focus to the search field");
+    for (const [filter, expected, activation] of [["attack", 6, "Enter"], ["crew", 14, " "], ["magic", 9, "Enter"], ["all", 29, " "]]) {
+      await page.locator(`[data-deck-filter="${filter}"]`).press(activation);
+      await page.waitForFunction(count => document.querySelectorAll("#card-library [data-library-card]:not([hidden])").length === count, expected);
+      assert.equal(await page.locator(`[data-deck-filter="${filter}"]`).getAttribute("aria-pressed"), "true");
+    }
+    for (const sort of ["cost-asc", "cost-desc", "name", "recommended"]) {
+      await page.locator("#deck-sort").focus();
+      await page.locator("#deck-sort").selectOption(sort);
+      const sortAudit = await page.evaluate(mode => {
+        const result = {};
+        for (const category of ["attack", "crew", "magic"]) {
+          const actual = [...document.querySelectorAll(`[data-armory-grid="${category}"] [data-library-card]`)].map(entry => entry.dataset.libraryCard);
+          const expected = Object.entries(window.GAME_DATA.cards).filter(([, card]) => card.category === category).map(([key, card], recommendedIndex) => ({ key, card, recommendedIndex }));
+          expected.sort((left, right) => mode === "cost-asc" ? left.card.cost - right.card.cost || left.card.name.localeCompare(right.card.name) : mode === "cost-desc" ? right.card.cost - left.card.cost || left.card.name.localeCompare(right.card.name) : mode === "name" ? left.card.name.localeCompare(right.card.name) : Object.keys(window.GAME_DATA.cards).indexOf(left.key) - Object.keys(window.GAME_DATA.cards).indexOf(right.key));
+          result[category] = { actual, expected: expected.map(entry => entry.key) };
+        }
+        return result;
+      }, sort);
+      assert.ok(Object.values(sortAudit).every(entry => JSON.stringify(entry.actual) === JSON.stringify(entry.expected)), `${sort} must produce the expected stable Armory order`);
+      assert.equal(await page.evaluate(() => document.activeElement?.id), "deck-sort", "sorting must preserve select focus");
+      await assertDeckRootsStable(page, `${sort} must reparent rather than rebuild Armory roots`);
+    }
+    await page.locator("#deck-search").fill("no such siege card");
+    await page.waitForFunction(() => !document.querySelector("#armory-no-results").classList.contains("hidden"));
+    assert.equal(await page.locator("#card-library [data-library-card]:visible").count(), 0, "no-results search must hide every stable card root");
+    assert.ok(await page.locator("#clear-empty-armory").evaluate(element => Math.min(element.getBoundingClientRect().width, element.getBoundingClientRect().height)) >= 48, "no-results Clear Filters must remain a 48px action");
+    await page.locator("#clear-empty-armory").click();
+    await page.waitForFunction(() => document.querySelectorAll("#card-library [data-library-card]:not([hidden])").length === 29 && document.querySelector("#deck-sort").value === "recommended");
+    assert.equal(await page.evaluate(() => document.activeElement?.id), "deck-search", "clearing no-results filters must return focus to the visible search control");
+    await assertDeckRootsStable(page, "search, filtering, sorting, and reset must preserve every Deck root");
     const scaledContext = await browser.newContext({
       viewport: { width: 320, height: 700 },
       deviceScaleFactor: 2,
-      reducedMotion: "reduce"
+      reducedMotion: "reduce",
+      hasTouch: true
     });
     const scaledPage = await scaledContext.newPage();
     scaledPage.on("console", message => { if (message.type() === "error") errors.push(`scaled console: ${message.text()}`); });
@@ -204,29 +255,58 @@ async function run() {
     assert.ok(scaledLobby.smallestCssAction >= 48 && scaledLobby.smallestCssAction * scaledLobby.deviceScaleFactor >= 96, "2x lobby actions must retain 48px CSS and 96px physical targets");
     await scaledPage.screenshot({ path: path.join(ARTIFACTS, "phase-07-lobby-320x700-2x-reduced.png") });
     await scaledPage.locator("#open-deck").click();
-    const scaledLayout = await scaledPage.evaluate(() => ({
-      deviceScaleFactor: devicePixelRatio,
-      horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth || document.querySelector("#deck-screen").scrollWidth > document.querySelector("#deck-screen").clientWidth,
-      smallestAction: Math.min(...[...document.querySelectorAll("#deck-screen button:not([disabled])")].filter(element => element.getClientRects().length).map(element => Math.min(element.getBoundingClientRect().width, element.getBoundingClientRect().height)))
-    }));
-    assert.equal(scaledLayout.deviceScaleFactor, 2, "scaled Deck fixture must render at 2x device scale");
-    assert.equal(scaledLayout.horizontalOverflow, false, "2x device-scale Deck must not clip horizontally");
-    assert.ok(scaledLayout.smallestAction >= 48, "2x device-scale Deck actions must retain 48px CSS targets");
-    const scaledFirstKey = await scaledPage.locator('[data-deck-slot="0"]').getAttribute("data-card-key");
-    await scaledPage.locator(`[data-library-card="${scaledFirstKey}"] [data-card-action="toggle"]`).press(" ");
-    await scaledPage.locator(`[data-library-card="${scaledFirstKey}"] [data-card-action="toggle"]`).press("Enter");
-    await scaledPage.locator(`[data-card-key="${scaledFirstKey}"][data-slot-action="left"]`).press("Enter");
+    await auditDeckLayout(scaledPage, 320, 700, 2);
+    assert.equal(await scaledPage.evaluate(() => devicePixelRatio), 2, "scaled Deck fixture must render at 2x device scale");
+    const scaledInitial = await deckOrder(scaledPage);
+    const scaledReplacement = await scaledPage.evaluate(deck => Object.keys(window.GAME_DATA.cards).find(key => !deck.includes(key)), scaledInitial);
+    await beginReplacementMotionAudit(scaledPage, "__reducedReplacementMotion");
+    await scaledPage.locator(`[data-library-card="${scaledReplacement}"] [data-card-action="toggle"]`).press("Enter");
+    await scaledPage.locator(`[data-library-card="${scaledReplacement}"] [data-card-action="choose"]`).press("Enter");
+    await assertVisible(scaledPage, "#deck-replace-modal");
+    await scaledPage.locator('[data-replace-slot="0"]').press("Enter");
+    const scaledReplaced = [...scaledInitial];
+    scaledReplaced[0] = scaledReplacement;
+    await waitForDeckOrder(scaledPage, scaledReplaced);
+    await scaledPage.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const reducedReplacementMotion = await endReplacementMotionAudit(scaledPage, "__reducedReplacementMotion");
+    assert.deepEqual(reducedReplacementMotion, { peakIncoming: 0, peakOutgoing: 0, simultaneous: false, ariaHidden: true, liveIncoming: 0, liveOutgoing: 0 }, "reduced motion must create neither incoming nor outgoing replacement clones");
+    const scaledMoveKey = scaledReplaced[1];
+    await scaledPage.locator(`[data-card-key="${scaledMoveKey}"][data-slot-action="select"]`).focus();
+    await scaledPage.keyboard.press("Space");
+    await scaledPage.keyboard.press("ArrowRight");
+    await scaledPage.keyboard.press("Space");
+    const scaledFinal = [...scaledReplaced];
+    scaledFinal.splice(2, 0, scaledFinal.splice(1, 1)[0]);
+    await waitForDeckOrder(scaledPage, scaledFinal);
+    await scaledPage.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    await scaledPage.locator(`[data-library-card="${scaledFinal[0]}"] [data-card-action="toggle"]`).press("Enter");
+    await scaledPage.locator(`[data-library-card="${scaledFinal[0]}"] [data-card-action="info"]`).press("Enter");
+    await scaledPage.locator("#close-deck-info").click();
+    await scaledPage.locator("#deck-search").fill("ward");
+    await scaledPage.locator("#clear-deck-search").click();
+    await touchScrollDeckFromCard(scaledContext, scaledPage, 3);
+    await touchDragDeckCard(scaledContext, scaledPage, 0, 1, "cancel");
+    assert.deepEqual(await deckOrder(scaledPage), scaledFinal, "touch pointercancel must preserve exact order");
+    await touchDragDeckCard(scaledContext, scaledPage, 0, 1);
+    const touchOrder = [...scaledFinal];
+    touchOrder.splice(1, 0, touchOrder.splice(0, 1)[0]);
+    await waitForDeckOrder(scaledPage, touchOrder);
+    await scaledPage.locator("#undo-deck-edit").click();
+    await waitForDeckOrder(scaledPage, scaledFinal);
+    await assertNoDeckTransients(scaledPage, "reduced-motion Deck actions must leave no clones, animations, or inline transforms");
     const reducedDeckState = await scaledPage.evaluate(() => {
       const visible = [...document.querySelectorAll("#deck-screen *")].filter(element => element.getClientRects().length);
       return {
         status: document.querySelector("#deck-status").dataset.state,
         animations: visible.filter(element => getComputedStyle(element).animationName !== "none").length,
-        transitions: visible.filter(element => getComputedStyle(element).transitionDuration.split(",").some(duration => Number.parseFloat(duration) > 0)).length,
-        flights: document.querySelectorAll(".card-flight").length
+        clones: document.querySelectorAll(".deck-travel-clone, .deck-drag-avatar, .armory-filter-clone").length,
+        transforms: [...document.querySelectorAll("#builder-deck .deck-slot__select, #card-library [data-library-card]")].filter(element => element.style.transform).length,
+        order: [...document.querySelectorAll("[data-deck-slot]")].map(slot => slot.dataset.cardKey).filter(Boolean)
       };
     });
-    assert.equal(reducedDeckState.status, "dirty", "reduced-motion Deck mutations must retain normal state changes");
-    assert.deepEqual([reducedDeckState.animations, reducedDeckState.transitions, reducedDeckState.flights], [0, 0, 0], "reduced-motion Deck must update without animations, transitions, or flight clones");
+    assert.equal(reducedDeckState.status, "saved", "reduced-motion Deck mutations must auto-save normally");
+    assert.deepEqual([reducedDeckState.animations, reducedDeckState.clones, reducedDeckState.transforms], [0, 0, 0], "reduced-motion Deck must update without animated or spatial residue");
+    assert.deepEqual(reducedDeckState.order, scaledFinal, "reduced motion must preserve the same replacement and reorder final state");
     await scaledPage.screenshot({ path: path.join(ARTIFACTS, "phase-05-deck-320x700-2x.png") });
     await scaledPage.locator("#battle-tab").click();
     await scaledPage.locator("#solo-button").click();
@@ -262,153 +342,271 @@ async function run() {
     await assertVisible(scaledPage, "#lobby");
     await scaledContext.close();
 
-    const storageFailureContext = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: "reduce" });
-    await storageFailureContext.addInitScript(() => {
-      Storage.prototype.setItem = function setItemUnavailable() { throw new DOMException("Storage unavailable", "QuotaExceededError"); };
-    });
-    const storageFailurePage = await storageFailureContext.newPage();
-    storageFailurePage.on("console", message => { if (message.type() === "error") errors.push(`storage console: ${message.text()}`); });
-    storageFailurePage.on("pageerror", error => errors.push(`storage page: ${error.message}`));
-    await storageFailurePage.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
-    const durableFallbackDeck = await storageFailurePage.locator("#loadout-deck [data-card-key]").evaluateAll(elements => elements.map(element => element.dataset.cardKey));
-    await storageFailurePage.locator("#open-deck").click();
-    const storageFirstKey = await storageFailurePage.locator('[data-deck-slot="0"]').getAttribute("data-card-key");
-    await storageFailurePage.locator(`[data-library-card="${storageFirstKey}"] [data-card-action="toggle"]`).click();
-    assert.equal(await storageFailurePage.locator("#deck-status").getAttribute("data-state"), "error", "failed draft persistence must stay operable and report an error");
-    await storageFailurePage.locator(`[data-library-card="${storageFirstKey}"] [data-card-action="toggle"]`).click();
-    await storageFailurePage.locator("#save-deck").click();
-    assert.equal(await storageFailurePage.locator("#deck-status").getAttribute("data-state"), "error", "failed Save must not claim success");
-    await storageFailurePage.waitForFunction(() => /not saved/i.test(document.querySelector("#deck-announcer")?.textContent || ""));
-    assert.match(await storageFailurePage.locator("#deck-announcer").textContent(), /not saved/i);
-    await storageFailurePage.locator("#battle-tab").click();
-    assert.deepEqual(await storageFailurePage.locator("#loadout-deck [data-card-key]").evaluateAll(elements => elements.map(element => element.dataset.cardKey)), durableFallbackDeck, "failed Save must not change the in-memory battle loadout");
-    await storageFailureContext.close();
+    await exercisePartialDeckPacking(browser, port, errors);
     await page.setViewportSize({ width: 390, height: 844 });
-
-    const detailCoverage = await page.evaluate(() => Object.entries(window.GAME_DATA.cards).map(([key, card]) => {
-      document.querySelector(`[data-library-card="${key}"] [data-card-action="details"]`).click();
-      const shownStats = [...document.querySelectorAll("#deck-detail-stats b")].map(element => element.textContent);
-      return {
-        key,
-        frame: document.querySelector("#deck-detail-frame [data-card-key]")?.dataset.cardKey,
-        name: document.querySelector("#deck-detail-name").textContent,
-        category: document.querySelector("#deck-detail-category").textContent,
-        description: document.querySelector("#deck-detail-description").textContent,
-        stats: shownStats,
-        expectedName: card.name.toUpperCase(),
-        expectedCategory: `${window.GAME_DATA.categories[card.category].name.toUpperCase()} / ${card.type.toUpperCase()} / ${card.cost} TAPS`,
-        expectedDescription: card.description,
-        expectedStats: window.GAME_DATA.cardStats[key]
-      };
-    }));
-    assert.ok(detailCoverage.every(item => item.frame === item.key && item.name === item.expectedName && item.category === item.expectedCategory && item.description === item.expectedDescription && JSON.stringify(item.stats) === JSON.stringify(item.expectedStats)), "every card must expose complete shared-frame details and stats");
-
-    for (const [filter, expected, key] of [["attack", 6, "Enter"], ["crew", 14, " "], ["magic", 9, "Enter"], ["all", 29, " "]]) {
-      await page.locator(`[data-deck-filter="${filter}"]`).press(key);
-      assert.equal(await page.locator("#card-library [data-library-card]:visible").count(), expected, `${filter} filter count`);
-      assert.equal(await page.locator(`[data-deck-filter="${filter}"]`).getAttribute("aria-pressed"), "true");
-    }
-    const initialSavedDeck = await page.evaluate(() => JSON.parse(localStorage.getItem("taptics-prototype-v3")).deck);
-    const selectedKey = initialSavedDeck[0];
+    const initialSavedDeck = await page.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem("taptics-prototype-v3"));
+      return saved.loadouts[saved.activeDeck].deck;
+    });
+    const selectedKey = initialSavedDeck[2];
     const replacementKey = catalogue.cards.find(key => !initialSavedDeck.includes(key));
-    assert.equal(await page.locator(`[data-library-card="${replacementKey}"] [data-card-action="toggle"]`).isEnabled(), false, "full Deck must disable only unselected Add actions");
-    assert.equal(await page.locator(`[data-library-card="${replacementKey}"] [data-card-action="details"]`).isEnabled(), true, "full Deck must keep details available");
-    const selectedToggle = page.locator(`[data-library-card="${selectedKey}"] [data-card-action="toggle"]`);
-    const replacementToggle = page.locator(`[data-library-card="${replacementKey}"] [data-card-action="toggle"]`);
-    await selectedToggle.evaluate(element => { element.scrollIntoView({ block: "center" }); element.focus({ preventScroll: true }); });
-    await page.waitForFunction(key => document.activeElement === document.querySelector(`[data-library-card="${key}"] [data-card-action="toggle"]`), selectedKey);
-    const selectionScroll = await page.locator("#deck-screen").evaluate(element => element.scrollTop);
-    await page.keyboard.press("Space");
-    assert.equal(await page.locator("#deck-status").getAttribute("data-state"), "invalid");
-    assert.equal(await page.locator("#builder-count").textContent(), "5 / 6");
-    assert.equal(await page.evaluate(key => document.activeElement === document.querySelector(`[data-library-card="${key}"] [data-card-action="toggle"]`), selectedKey), true, "library focus must survive removal");
-    assert.ok(Math.abs(await page.locator("#deck-screen").evaluate(element => element.scrollTop) - selectionScroll) <= 2, "library selection must preserve scroll");
-    await replacementToggle.press("Enter");
-    assert.equal(await page.locator("#deck-status").getAttribute("data-state"), "dirty");
-    assert.equal(await replacementToggle.getAttribute("aria-pressed"), "true");
-    const draftBeforeLeave = await page.evaluate(() => ({ deck: [...document.querySelectorAll("[data-deck-slot]")].map(slot => slot.dataset.cardKey).filter(Boolean), weapon: document.querySelector("#weapon-options [aria-pressed=true]").dataset.weapon }));
-    await page.locator('[data-weapon="volley"]').press(" ");
-    draftBeforeLeave.weapon = "volley";
+    await page.evaluate(() => {
+      const nativeSetItem = Storage.prototype.setItem;
+      window.__deckAtomic = { states: [], writes: [], nativeSetItem };
+      window.__deckAtomic.observer = new MutationObserver(() => window.__deckAtomic.states.push(document.querySelector("#deck-status").dataset.state));
+      window.__deckAtomic.observer.observe(document.querySelector("#deck-status"), { attributes: true, attributeFilter: ["data-state"] });
+      Storage.prototype.setItem = function loggedSetItem(key, value) {
+        if (key === "taptics-prototype-v3") {
+          const saved = JSON.parse(value);
+          const loadout = saved.loadouts[saved.activeDeck];
+          window.__deckAtomic.writes.push({ activeDeck: saved.activeDeck, selectedDeck: saved.selectedDeck, deckLength: loadout.deck.length, draftLength: loadout.deckDraft?.deck?.length ?? null });
+        }
+        return nativeSetItem.call(this, key, value);
+      };
+    });
+    await page.locator(`[data-deck-slot="2"] [data-slot-action="select"]`).click();
+    assert.equal(await page.locator('#builder-deck [data-slot-action="remove"]:visible').count(), 1, "selecting a slot must reveal one contextual Remove control");
+    assert.equal(await page.locator('#builder-deck [data-slot-action="info"]:visible').count(), 1, "selecting a slot must reveal one contextual Info control");
+    assert.equal(await page.locator('[data-deck-slot="2"] [data-slot-action="info"]').textContent(), "INFO", "Deck Info must use a readable text label");
+    assert.equal(await page.locator('[data-slot-action="drag"], .deck-slot__drag-handle').count(), 0, "contextual Remove must not reintroduce the retired drag control");
+    assert.ok(await page.locator(`[data-deck-slot="2"] [data-slot-action="remove"]`).evaluate(element => Math.min(element.getBoundingClientRect().width, element.getBoundingClientRect().height)) >= 48, "contextual Remove must remain a 48px action");
+    assert.equal(await page.locator('[data-deck-slot="2"] .deck-slot__actions').evaluate(element => {
+      const [info, remove] = element.querySelectorAll("button");
+      return info.getBoundingClientRect().bottom <= remove.getBoundingClientRect().top + 1;
+    }), true, "Deck Info must appear above Remove in the expanded overlay");
+    await page.locator('[data-deck-slot="2"] [data-slot-action="remove"]').focus();
+    await page.keyboard.press("Escape");
+    await page.locator('[data-deck-slot="2"] [data-slot-action="remove"]').waitFor({ state: "hidden" });
+    assert.equal(await page.evaluate(() => document.activeElement?.matches('[data-deck-slot="2"] [data-slot-action="select"]')), true, "Escape must return focus to the collapsed Deck card face");
+
+    await page.locator(`[data-library-card="${replacementKey}"] [data-card-action="toggle"]`).click();
+    const replacementControl = page.locator(`[data-library-card="${replacementKey}"] [data-card-action="choose"]`);
+    assert.equal(await page.locator(`[data-library-card="${replacementKey}"] [data-card-action="info"]`).textContent(), "INFO", "Armory Info must use a readable text label");
+    assert.equal(await page.locator(`[data-library-card="${replacementKey}"] .library-card__actions`).evaluate(element => {
+      const [info, choose] = element.querySelectorAll("button");
+      return info.getBoundingClientRect().bottom <= choose.getBoundingClientRect().top + 1;
+    }), true, "Armory Info must appear above Choose Position in the expanded overlay");
+    await replacementControl.scrollIntoViewIfNeeded();
+    await replacementControl.click();
+    await assertVisible(page, "#deck-replace-modal");
+    assert.deepEqual(await page.locator("#deck-replacement-options .replacement-slot__position").allTextContents(), ["REPLACE #1", "REPLACE #2", "REPLACE #3", "REPLACE #4", "REPLACE #5", "REPLACE #6"], "a full deck must offer all six explicit replacement positions");
+    await assertReplacementCandidateUnlabeled(page, replacementKey, "collection-first replacement");
+    await page.keyboard.press("Escape");
+    await page.locator("#deck-replace-modal").waitFor({ state: "hidden" });
+    await assertReplacementCandidateCleared(page, replacementKey, "Escape");
+    assert.deepEqual(await deckOrder(page), initialSavedDeck, "Escape must cancel explicit position selection");
+
+    await replacementControl.click();
+    await page.locator("#cancel-replacement-sheet").click();
+    await page.locator("#deck-replace-modal").waitFor({ state: "hidden" });
+    await assertReplacementCandidateCleared(page, replacementKey, "Cancel");
+    assert.deepEqual(await deckOrder(page), initialSavedDeck, "Cancel must close the position picker without mutation");
+
+    await replacementControl.click();
+    await page.locator("#deck-replace-modal").dispatchEvent("pointerdown");
+    await page.locator("#deck-replace-modal").waitFor({ state: "hidden" });
+    await assertReplacementCandidateCleared(page, replacementKey, "backdrop dismissal");
+    assert.deepEqual(await deckOrder(page), initialSavedDeck, "backdrop activation must close the position picker without mutation");
+
+    const replacementScroll = await page.locator("#deck-screen").evaluate(element => element.scrollTop);
+    await replacementControl.click();
+    await beginReplacementMotionAudit(page, "__animatedReplacementMotion");
+    await page.locator('[data-replace-slot="2"]').click();
+    await page.waitForFunction(() => window.__animatedReplacementMotion?.state.simultaneous === true);
+    const deckFirstOrder = [...initialSavedDeck];
+    deckFirstOrder[2] = replacementKey;
+    await waitForDeckOrder(page, deckFirstOrder);
+    assert.equal(await page.locator("#deck-status").getAttribute("data-state"), "saved", "complete replacements must auto-save immediately");
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const replacementScrollAfter = await page.locator("#deck-screen").evaluate(element => element.scrollTop);
+    assert.ok(Math.abs(replacementScrollAfter - replacementScroll) <= 2, `explicit replacement must preserve Armory scroll: ${replacementScroll} -> ${replacementScrollAfter}`);
+    await page.waitForFunction(() => !document.querySelector(".deck-travel-clone"));
+    const animatedReplacementMotion = await endReplacementMotionAudit(page, "__animatedReplacementMotion");
+    assert.ok(animatedReplacementMotion.peakIncoming >= 1 && animatedReplacementMotion.peakOutgoing >= 1 && animatedReplacementMotion.simultaneous && animatedReplacementMotion.ariaHidden, `animated replacement must briefly expose paired aria-hidden incoming and outgoing clones: ${JSON.stringify(animatedReplacementMotion)}`);
+    assert.deepEqual([animatedReplacementMotion.liveIncoming, animatedReplacementMotion.liveOutgoing], [0, 0], "animated replacement clones must clean up after completion");
+    await auditVisibleArmoryCards(page, "deck-first replacement");
+    const atomicAudit = await page.evaluate(() => {
+      window.__deckAtomic.observer.disconnect();
+      Storage.prototype.setItem = window.__deckAtomic.nativeSetItem;
+      return { states: window.__deckAtomic.states, writes: window.__deckAtomic.writes };
+    });
+    assert.equal(atomicAudit.states.includes("invalid"), false, "atomic replacement must never expose an intermediate invalid state");
+    assert.ok(atomicAudit.writes.length > 0 && atomicAudit.writes.every(write => write.activeDeck === 0 && write.selectedDeck === 0 && write.deckLength === 6 && write.draftLength === null), "complete replacements must persist only a complete active loadout with no draft");
+    assert.equal(new Set(await deckOrder(page)).size, 6, "atomic replacement must preserve uniqueness");
+    assert.deepEqual((await page.evaluate(() => JSON.parse(localStorage.getItem("taptics-prototype-v3")))).loadouts[0].deck, deckFirstOrder, "replacement autosave must be durable before its confirmation animation ends");
+
+    const memberKey = deckFirstOrder[0];
+    const beforeMemberIdentification = await deckOrder(page);
+    await page.locator(`[data-library-card="${memberKey}"] [data-card-action="toggle"]`).click();
+    assert.equal(await page.locator(`[data-library-card="${memberKey}"] [data-card-action="locate"]`).textContent(), "IN DECK #1", "expanded members must expose their # draw position");
+    await page.locator(`[data-library-card="${memberKey}"] [data-card-action="locate"]`).click();
+    await page.waitForFunction(key => document.querySelector(`[data-card-key="${key}"][data-deck-slot]`)?.classList.contains("is-located"), memberKey);
+    assert.deepEqual(await deckOrder(page), beforeMemberIdentification, "choosing an existing member must identify it without duplication or removal");
+    assert.match(await page.locator("#deck-announcer").textContent(), /already in draw position/i);
+
+    const sheetCandidate = selectedKey;
+    await page.locator(`[data-library-card="${sheetCandidate}"] [data-card-action="toggle"]`).click();
+    const sheetOrigin = page.locator(`[data-library-card="${sheetCandidate}"] [data-card-action="choose"]`);
+    const beforeSheet = await deckOrder(page);
+    await sheetOrigin.click();
+    await assertVisible(page, "#deck-replace-modal");
+    await page.waitForFunction(() => document.activeElement?.id === "deck-replace-title");
+    await assertReplacementCandidateUnlabeled(page, sheetCandidate, "collection-first replacement");
+    assert.equal(await page.locator("#deck-replacement-options [data-replace-slot]").count(), 6, "replacement sheet must expose all six draw positions");
+    assert.equal(await page.locator(".app-shell").evaluate(element => element.inert), true, "replacement sheet must inert the app shell");
+    await page.keyboard.press("Escape");
+    await page.locator("#deck-replace-modal").waitFor({ state: "hidden" });
+    await page.waitForFunction(key => document.activeElement?.matches(`[data-library-card="${key}"] [data-card-action="choose"]`), sheetCandidate);
+    await assertReplacementCandidateCleared(page, sheetCandidate, "Escape");
+    assert.deepEqual(await deckOrder(page), beforeSheet, "Escape must cancel collection-first replacement");
+    await sheetOrigin.click();
+    await page.locator("#cancel-replacement-sheet").click();
+    await page.locator("#deck-replace-modal").waitFor({ state: "hidden" });
+    await assertReplacementCandidateCleared(page, sheetCandidate, "Cancel");
+    assert.deepEqual(await deckOrder(page), beforeSheet, "Cancel must close the replacement sheet without mutation");
+    await sheetOrigin.click();
+    await page.locator("#deck-replace-modal").dispatchEvent("pointerdown");
+    await page.locator("#deck-replace-modal").waitFor({ state: "hidden" });
+    await assertReplacementCandidateCleared(page, sheetCandidate, "backdrop dismissal");
+    assert.deepEqual(await deckOrder(page), beforeSheet, "backdrop activation must close the replacement sheet without mutation");
+    await sheetOrigin.click();
+    assert.ok(await page.locator("#cancel-replacement-sheet").evaluate(element => Math.min(element.getBoundingClientRect().width, element.getBoundingClientRect().height)) >= 48, "replacement cancellation must remain a 48px action");
+    await page.locator('[data-replace-slot="4"]').click();
+    await page.locator("#deck-replace-modal").waitFor({ state: "hidden" });
+    const sheetCompleted = [...beforeSheet];
+    sheetCompleted[4] = sheetCandidate;
+    await waitForDeckOrder(page, sheetCompleted);
+    await assertReplacementCandidateCleared(page, sheetCandidate, "replacement completion");
+    await auditVisibleArmoryCards(page, "collection-first replacement");
+    assert.equal(new Set(sheetCompleted).size, 6, "collection-first completion must preserve a unique six-card deck");
+
+    const beforeRemoval = await deckOrder(page);
+    await page.locator('[data-deck-slot="1"] [data-slot-action="select"]').click();
+    await page.locator('[data-deck-slot="1"] [data-slot-action="remove"]').click();
+    await page.waitForFunction(() => document.querySelectorAll("[data-deck-slot][data-card-key]:not([data-card-key=''])").length === 5);
+    assert.equal(await page.locator("#deck-status").getAttribute("data-state"), "invalid", "contextual removal must expose the incomplete state");
+    assert.deepEqual(await page.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem("taptics-prototype-v3")).loadouts[0];
+      return { complete: saved.deck.length, draft: saved.deckDraft.deck.length };
+    }), { complete: 6, draft: 5 }, "contextual removal must preserve the last complete deck while auto-saving the partial edit");
+    await page.locator("#undo-deck-edit").click();
+    await waitForDeckOrder(page, beforeRemoval);
+    assert.equal(await page.locator("#deck-undo").isHidden(), true, "Undo must consume the single history entry");
+
+    const beforePointer = await deckOrder(page);
+    await pointerDragDeckCard(page, 0, 1, "cancel");
+    assert.deepEqual(await deckOrder(page), beforePointer, "Escape must cancel an active pointer reorder");
+    await pointerDragDeckCard(page, 0, 1, "invalid");
+    assert.deepEqual(await deckOrder(page), beforePointer, "an invalid pointer drop must preserve exact order");
+    await pointerDragDeckCard(page, 0, 1);
+    const pointerOrder = [...beforePointer];
+    pointerOrder.splice(1, 0, pointerOrder.splice(0, 1)[0]);
+    await waitForDeckOrder(page, pointerOrder);
+    await page.locator("#undo-deck-edit").click();
+    await waitForDeckOrder(page, beforePointer);
+    await assertNoDeckTransients(page, "committed and canceled pointer reorders must clean drag state");
+
+    await page.locator('[data-weapon="cannon"]').focus();
+    await page.keyboard.press("ArrowRight");
+    await page.waitForFunction(() => document.querySelector('[data-weapon="volley"]').getAttribute("aria-checked") === "true" && document.activeElement?.dataset.weapon === "volley");
+    await page.keyboard.press("Home");
+    await page.waitForFunction(() => document.querySelector('[data-weapon="cannon"]').getAttribute("aria-checked") === "true" && document.activeElement?.dataset.weapon === "cannon");
+    await page.keyboard.press("End");
+    await page.waitForFunction(() => document.querySelector('[data-weapon="volley"]').getAttribute("aria-checked") === "true" && document.activeElement?.dataset.weapon === "volley");
+    assert.equal(await page.locator('#weapon-options [role="radio"][aria-checked="true"]').count(), 1, "weapon changes must retain exclusive radio semantics");
+    await page.locator("#undo-deck-edit").click();
+    await page.waitForFunction(() => document.querySelector('[data-weapon="cannon"]').getAttribute("aria-checked") === "true");
+    assert.equal(await selectedDeckWeapon(page), "cannon", "Undo must restore and auto-save the previous weapon");
+    await assertDeckRootsStable(page, "replacement, removal, Undo, drag, and weapon edits must preserve all stable roots");
+
+    await page.locator("#deck-screen").evaluate(element => { element.scrollTop = Math.min(700, element.scrollHeight - element.clientHeight); });
+    const savedScroll = await page.locator("#deck-screen").evaluate(element => element.scrollTop);
+    const autoSavedBeforeLeave = { deck: await deckOrder(page), weapon: await selectedDeckWeapon(page) };
     await page.locator("#battle-tab").click();
     await assertVisible(page, "#lobby");
-    assert.deepEqual(await page.locator("#loadout-deck [data-card-key]").evaluateAll(elements => elements.map(element => element.dataset.cardKey)), initialSavedDeck, "unsaved draft must not alter the battle loadout");
+    assert.deepEqual(await page.locator("#loadout-deck [data-card-key]").evaluateAll(elements => elements.map(element => element.dataset.cardKey)), autoSavedBeforeLeave.deck, "complete edits must update the active battle loadout automatically");
     assert.equal(await page.locator("#loadout-weapon-name").textContent(), "CANNON");
     await page.locator("#open-deck").click();
-    assert.deepEqual(await page.locator("[data-deck-slot]").evaluateAll(elements => elements.map(element => element.dataset.cardKey).filter(Boolean)), draftBeforeLeave.deck, "Battle navigation must preserve the exact draft");
-    assert.equal(await page.locator('[data-weapon="volley"]').getAttribute("aria-pressed"), "true");
-    assert.equal(await page.locator("#deck-status").getAttribute("data-state"), "dirty");
+    await waitForDeckOrder(page, autoSavedBeforeLeave.deck);
+    assert.equal(await selectedDeckWeapon(page), autoSavedBeforeLeave.weapon, "Battle navigation must preserve the auto-saved weapon");
+    await page.waitForFunction(scrollTop => Math.abs(document.querySelector("#deck-screen").scrollTop - scrollTop) <= 2, savedScroll);
+    assert.ok(Math.abs(await page.locator("#deck-screen").evaluate(element => element.scrollTop) - savedScroll) <= 2, "returning to Deck must restore its previous scroll position");
+    assert.equal(await page.locator("#deck-status").getAttribute("data-state"), "saved");
+
+    const cancelKey = autoSavedBeforeLeave.deck[0];
+    const cancelOrder = await deckOrder(page);
+    await page.locator(`[data-card-key="${cancelKey}"][data-slot-action="select"]`).focus();
+    await page.keyboard.press("Space");
+    await page.keyboard.press("End");
+    await page.keyboard.press("Escape");
+    await waitForDeckOrder(page, cancelOrder);
+    await assertNoDeckTransients(page, "canceling keyboard reorder must restore exact order without residue");
+
+    const reorderKey = cancelOrder[4];
+    const reorderControl = page.locator(`button[data-card-key="${reorderKey}"][data-slot-action="select"]`);
+    await reorderControl.scrollIntoViewIfNeeded();
+    await reorderControl.focus();
+    const reorderScroll = await page.locator("#deck-screen").evaluate(element => element.scrollTop);
+    await page.keyboard.press("Space");
+    await page.waitForFunction(() => document.activeElement?.getAttribute("aria-grabbed") === "true");
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("Space");
+    const savedOrder = [...cancelOrder];
+    savedOrder.splice(2, 0, savedOrder.splice(4, 1)[0]);
+    await waitForDeckOrder(page, savedOrder);
+    await page.waitForFunction(key => document.activeElement?.dataset.cardKey === key && document.activeElement?.dataset.slotAction === "select", reorderKey);
+    assert.equal(await page.evaluate(key => document.activeElement?.dataset.cardKey === key && document.activeElement?.dataset.slotAction === "select", reorderKey), true, "keyboard reorder focus must follow the same card control");
+    assert.ok(Math.abs(await page.locator("#deck-screen").evaluate(element => element.scrollTop) - reorderScroll) <= 2, "reordering must preserve Deck scroll");
+    await page.locator('[data-weapon="volley"]').click();
+    assert.equal(await page.locator('[data-weapon="volley"]').getAttribute("aria-checked"), "true");
+    const immediatelyStored = await page.evaluate(() => JSON.parse(localStorage.getItem("taptics-prototype-v3")));
+    assert.deepEqual(immediatelyStored.loadouts[0].deck, savedOrder, "keyboard reorder must auto-save synchronously");
+    assert.equal(immediatelyStored.loadouts[0].weapon, "volley");
+    assert.equal(immediatelyStored.loadouts[0].deckDraft, null);
+    assert.equal(await page.locator("#deck-status").getAttribute("data-state"), "saved");
+
+    await page.locator('[data-deck-tab="1"]').click();
+    await page.waitForFunction(() => document.querySelector('[data-deck-tab="1"]').getAttribute("aria-selected") === "true");
+    const deckTwoInitial = await deckOrder(page);
+    assert.deepEqual(deckTwoInitial, catalogue.deck, "new deck slots must start from the safe default loadout");
+    const deckTwoReplacement = catalogue.cards.find(key => !deckTwoInitial.includes(key) && key !== replacementKey);
+    await page.locator(`[data-library-card="${deckTwoReplacement}"] [data-card-action="toggle"]`).click();
+    await page.locator(`[data-library-card="${deckTwoReplacement}"] [data-card-action="choose"]`).click();
+    await page.locator('[data-replace-slot="0"]').click();
+    const deckTwoOrder = [...deckTwoInitial];
+    deckTwoOrder[0] = deckTwoReplacement;
+    await waitForDeckOrder(page, deckTwoOrder);
+    assert.deepEqual(await page.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem("taptics-prototype-v3"));
+      return { activeDeck: saved.activeDeck, selectedDeck: saved.selectedDeck, deckOne: saved.loadouts[0].deck, deckTwo: saved.loadouts[1].deck };
+    }), { activeDeck: 1, selectedDeck: 1, deckOne: savedOrder, deckTwo: deckTwoOrder }, "switching decks must preserve independent auto-saved loadouts and make the selected deck active");
+    await page.locator("#battle-tab").click();
+    assert.deepEqual(await page.locator("#loadout-deck [data-card-key]").evaluateAll(elements => elements.map(element => element.dataset.cardKey)), deckTwoOrder, "the lobby must use the newly active second deck");
+    await page.locator("#open-deck").click();
+    await page.locator('[data-deck-tab="0"]').click();
+    await waitForDeckOrder(page, savedOrder);
+    assert.equal(await selectedDeckWeapon(page), "volley", "switching back must restore Deck 1's independent weapon");
+    assert.deepEqual(await page.locator("#deck-tabs [data-deck-tab] small").allTextContents(), ["ACTIVE", "READY", "READY", "READY", "READY"], "five complete deck tabs must expose one active deck and four ready alternatives");
     await page.reload({ waitUntil: "networkidle" });
     await page.locator("#open-deck").click();
-    assert.deepEqual(await page.locator("[data-deck-slot]").evaluateAll(elements => elements.map(element => element.dataset.cardKey).filter(Boolean)), draftBeforeLeave.deck, "persisted unsaved draft must survive reload");
-    assert.equal(await page.locator('[data-weapon="volley"]').getAttribute("aria-pressed"), "true");
-    await page.locator("#restore-deck").click();
+    await waitForDeckOrder(page, savedOrder);
+    assert.equal(await page.locator('[data-deck-tab="0"]').getAttribute("aria-selected"), "true", "the selected deck tab must survive reload");
+    assert.equal(await page.locator('[data-weapon="volley"]').getAttribute("aria-checked"), "true", "auto-saved weapon must survive reload");
     assert.equal(await page.locator("#deck-status").getAttribute("data-state"), "saved");
-    await page.evaluate(() => {
-      window.__deckRootRefs = { slots: [...document.querySelectorAll("[data-deck-slot]")], cards: [...document.querySelectorAll("[data-library-card]")], details: document.querySelector("#deck-details") };
-      window.__deckDomCount = document.querySelectorAll("*").length;
-    });
+
+    await rememberDeckRoots(page);
+    await page.evaluate(() => { window.__deckDomCount = document.querySelectorAll("*").length; document.querySelector("#deck-screen").scrollTop = Math.min(500, document.querySelector("#deck-screen").scrollHeight - document.querySelector("#deck-screen").clientHeight); });
+    const repeatedScroll = await page.locator("#deck-screen").evaluate(element => element.scrollTop);
     for (let visit = 0; visit < 10; visit += 1) {
       await page.locator("#battle-tab").click();
       await page.locator("#open-deck").click();
     }
-    const repeatedDeck = await page.evaluate(() => ({
-      nodes: document.querySelectorAll("*").length,
-      cards: document.querySelectorAll("[data-library-card]").length,
-      details: document.querySelectorAll("#deck-details").length,
-      stable: window.__deckRootRefs.slots.every((node, index) => node === document.querySelectorAll("[data-deck-slot]")[index]) && window.__deckRootRefs.cards.every((node, index) => node === document.querySelectorAll("[data-library-card]")[index]) && window.__deckRootRefs.details === document.querySelector("#deck-details")
-    }));
-    assert.deepEqual(repeatedDeck, { nodes: await page.evaluate(() => window.__deckDomCount), cards: 29, details: 1, stable: true }, "repeated Deck visits must not accumulate nodes or replace stable roots");
-
-    const slotRemove = page.locator(`[data-card-key="${selectedKey}"][data-slot-action="remove"]`);
-    await slotRemove.evaluate(element => { element.scrollIntoView({ block: "center" }); element.focus({ preventScroll: true }); });
-    const slotRemovalScroll = await page.locator("#deck-screen").evaluate(element => element.scrollTop);
-    await slotRemove.press(" ");
-    assert.equal(await page.locator("#builder-count").textContent(), "5 / 6", "slot Remove must work from the keyboard");
-    assert.ok(Math.abs(await page.locator("#deck-screen").evaluate(element => element.scrollTop) - slotRemovalScroll) <= 2, "slot removal must preserve Deck scroll");
-    await page.locator("#restore-deck").click();
-
-    const allCardToggleFailures = await page.evaluate(() => {
-      const failures = [];
-      for (const entry of document.querySelectorAll("[data-library-card].selected")) entry.querySelector('[data-card-action="toggle"]').click();
-      for (const entry of document.querySelectorAll("[data-library-card]")) {
-        const toggle = entry.querySelector('[data-card-action="toggle"]');
-        toggle.click();
-        if (!entry.classList.contains("selected") || toggle.getAttribute("aria-pressed") !== "true") failures.push(`${entry.dataset.libraryCard}:add`);
-        toggle.click();
-        if (entry.classList.contains("selected") || toggle.getAttribute("aria-pressed") !== "false") failures.push(`${entry.dataset.libraryCard}:remove`);
-      }
-      return failures;
-    });
-    assert.deepEqual(allCardToggleFailures, [], "all 29 cards must support add and remove through the delegated control");
-    await page.locator("#restore-deck").click();
-
-    const reorderControl = page.locator('button[data-card-key="timeBomb"][data-slot-action="left"]');
-    await reorderControl.evaluate(element => { element.scrollIntoView({ block: "center" }); element.focus({ preventScroll: true }); });
-    const reorderScroll = await page.locator("#deck-screen").evaluate(element => element.scrollTop);
-    await reorderControl.press("Enter");
-    await page.waitForFunction(() => document.activeElement?.dataset.cardKey === "timeBomb" && document.activeElement?.dataset.slotAction === "left");
-    const savedOrder = [initialSavedDeck[0], initialSavedDeck[1], initialSavedDeck[2], "timeBomb", "tapForge", "suppressingFire"];
-    assert.deepEqual(await page.locator("[data-deck-slot]").evaluateAll(elements => elements.map(element => element.dataset.cardKey)), savedOrder, "Move Left must preserve exact draw order");
-    assert.equal(await page.evaluate(() => document.activeElement?.dataset.cardKey === "timeBomb" && document.activeElement?.dataset.slotAction === "left"), true, "reorder focus must follow the same card control");
-    assert.ok(Math.abs(await page.locator("#deck-screen").evaluate(element => element.scrollTop) - reorderScroll) <= 2, "reordering must preserve Deck scroll");
-    await page.locator('[data-weapon="volley"]').press(" ");
-    assert.equal(await page.locator('[data-weapon="volley"]').getAttribute("aria-pressed"), "true");
-    assert.equal(await page.locator('[data-weapon="cannon"]').getAttribute("aria-pressed"), "false");
-    const stableRoots = await page.evaluate(() => Boolean(window.__deckRootRefs) && window.__deckRootRefs.slots.every((node, index) => node === document.querySelectorAll("[data-deck-slot]")[index]) && window.__deckRootRefs.cards.every((node, index) => node === document.querySelectorAll("[data-library-card]")[index]) && window.__deckRootRefs.details === document.querySelector("#deck-details"));
-    assert.equal(stableRoots, true, "Deck slot and library roots must remain stable across updates");
-    await page.locator("#save-deck").click();
-    assert.equal(await page.locator("#deck-status").getAttribute("data-state"), "saving");
-    await page.waitForFunction(() => document.querySelector("#deck-status")?.dataset.state === "saved", null, { timeout: 5000 });
-    assert.equal(await page.locator("#deck-screen").isVisible(), true, "Save must stay on Deck");
-    const storedLoadout = await page.evaluate(() => JSON.parse(localStorage.getItem("taptics-prototype-v3")));
-    assert.deepEqual(storedLoadout.deck, savedOrder);
-    assert.equal(storedLoadout.weapon, "volley");
-    assert.equal(storedLoadout.deckDraft, null);
-    await page.reload({ waitUntil: "networkidle" });
-    await page.locator("#open-deck").click();
-    assert.deepEqual(await page.locator("[data-deck-slot]").evaluateAll(elements => elements.map(element => element.dataset.cardKey)), savedOrder, "saved order must survive reload");
-    assert.equal(await page.locator('[data-weapon="volley"]').getAttribute("aria-pressed"), "true", "saved weapon must survive reload");
-    assert.equal(await page.locator("#deck-status").getAttribute("data-state"), "saved");
+    await page.waitForFunction(scrollTop => Math.abs(document.querySelector("#deck-screen").scrollTop - scrollTop) <= 2, repeatedScroll);
+    await assertDeckRootsStable(page, "repeated Deck visits must retain all stable roots and singleton overlays");
+    assert.equal(await page.evaluate(() => document.querySelectorAll("*").length), await page.evaluate(() => window.__deckDomCount), "repeated Deck visits must not accumulate DOM nodes");
+    await assertNoDeckTransients(page, "repeated Deck visits must clean obsolete animation and drag state");
+    await exerciseDeckStorageFailure(browser, port, errors);
 
     await page.locator("#battle-tab").click();
     await assertVisible(page, "#lobby");
@@ -492,7 +690,8 @@ async function run() {
     await assertVisible(page, "#game");
     assert.equal(await page.locator("#battle-hand [data-hand-slot]").count(), 3, "battle must use the three-card contract");
     assert.deepEqual(await page.locator("#battle-hand [data-hand-slot]").evaluateAll(elements => elements.map(element => element.dataset.cardKey)), savedOrder.slice(0, 3), "CPU battle must use the saved opening order");
-    assert.equal(await page.locator("#next-card-label").textContent(), "NEXT: HOURGLASS CURSE", "CPU battle must use the saved queue order");
+    const expectedNextCard = await page.evaluate(key => window.GAME_DATA.cards[key].name.toUpperCase(), savedOrder[3]);
+    assert.equal(await page.locator("#next-card-label").textContent(), `NEXT: ${expectedNextCard}`, "CPU battle must use the active deck's auto-saved queue order");
     assert.match(await page.locator("#weapon-short").getAttribute("class"), /pixel-weapon-volley/, "CPU battle must use the saved weapon");
     assert.equal(await page.locator("#battle-hand .card-frame__art").evaluateAll(elements => elements.every(element => getComputedStyle(element).backgroundImage.includes("cards-atlas.png"))), true, "battle hand must use catalogue portraits");
     assert.match(await page.locator("#weapon-short").getAttribute("class"), /pixel-weapon-volley/);
@@ -695,8 +894,9 @@ async function run() {
 
     await page.evaluate(() => {
       const key = "taptics-prototype-v3";
-      const profile = JSON.parse(localStorage.getItem(key)) || { version: 4, duels: 0, wins: 0, run: 0, bestRun: 0, challenge: 0, challengeComplete: false, recent: [], deck: [...window.GAME_DATA.defaultDeck], weapon: "cannon" };
-      profile.weapon = "volley";
+      const profile = JSON.parse(localStorage.getItem(key));
+      profile.loadouts[profile.activeDeck].weapon = "volley";
+      profile.loadouts[profile.activeDeck].deckDraft = null;
       localStorage.setItem(key, JSON.stringify(profile));
     });
     await page.reload({ waitUntil: "networkidle" });
@@ -736,7 +936,8 @@ async function run() {
     await page.evaluate(() => {
       const key = "taptics-prototype-v3";
       const profile = JSON.parse(localStorage.getItem(key));
-      profile.deck = ["scavenger", "emergencyCache", "phaseShield", "piercingShot", "timeBomb", "suppressingFire"];
+      profile.loadouts[profile.activeDeck].deck = ["scavenger", "emergencyCache", "phaseShield", "piercingShot", "timeBomb", "suppressingFire"];
+      profile.loadouts[profile.activeDeck].deckDraft = null;
       localStorage.setItem(key, JSON.stringify(profile));
     });
     await page.reload({ waitUntil: "networkidle" });
@@ -759,7 +960,8 @@ async function run() {
     await page.evaluate(() => {
       const key = "taptics-prototype-v3";
       const profile = JSON.parse(localStorage.getItem(key));
-      profile.deck = ["tapForge", "phaseShield", "piercingShot", "scavenger", "timeBomb", "suppressingFire"];
+      profile.loadouts[profile.activeDeck].deck = ["tapForge", "phaseShield", "piercingShot", "scavenger", "timeBomb", "suppressingFire"];
+      profile.loadouts[profile.activeDeck].deckDraft = null;
       localStorage.setItem(key, JSON.stringify(profile));
     });
     await page.reload({ waitUntil: "networkidle" });
@@ -782,7 +984,8 @@ async function run() {
     await page.evaluate(() => {
       const key = "taptics-prototype-v3";
       const profile = JSON.parse(localStorage.getItem(key));
-      profile.deck = ["timeBomb", "scavenger", "piercingShot", "phaseShield", "emergencyCache", "suppressingFire"];
+      profile.loadouts[profile.activeDeck].deck = ["timeBomb", "scavenger", "piercingShot", "phaseShield", "emergencyCache", "suppressingFire"];
+      profile.loadouts[profile.activeDeck].deckDraft = null;
       localStorage.setItem(key, JSON.stringify(profile));
     });
     await page.reload({ waitUntil: "networkidle" });
@@ -814,14 +1017,16 @@ async function run() {
       libraryCards: document.querySelectorAll("[data-library-card]").length,
       effectNodes: document.querySelector("#battle-effects").children.length,
       cardFlights: document.querySelectorAll(".card-flight").length,
+      deckClones: document.querySelectorAll(".deck-travel-clone, .deck-drag-avatar, .armory-filter-clone").length,
+      deckTransforms: [...document.querySelectorAll("#builder-deck .deck-slot__select, #card-library [data-library-card]")].filter(element => element.style.transform).length,
       resultParticles: document.querySelector("#result-particles").children.length,
-      transientHidden: ["#card-inspector", "#toast", "#leave-modal", "#result-modal"].every(selector => document.querySelector(selector).classList.contains("hidden")),
-      singletonSurfaces: ["#card-inspector", "#toast", "#leave-modal", "#result-modal", "#deck-details"].every(selector => document.querySelectorAll(selector).length === 1),
+      transientHidden: ["#card-inspector", "#toast", "#leave-modal", "#result-modal", "#deck-info-modal", "#deck-replace-modal"].every(selector => document.querySelector(selector).classList.contains("hidden")),
+      singletonSurfaces: ["#card-inspector", "#toast", "#leave-modal", "#result-modal", "#deck-info-modal", "#deck-replace-modal"].every(selector => document.querySelectorAll(selector).length === 1),
       listeners: Object.fromEntries(["queueStatus", "matchFound", "state", "gameOver", "disconnect", "connect"].map(event => [event, socket.listeners(event).length]))
     }));
     assert.ok(finalLifecycle.nodes < 1200, `repeated matches must keep the final DOM bounded; observed ${finalLifecycle.nodes} nodes`);
     assert.ok([0, 29].includes(finalLifecycle.libraryCards), "repeated matches must retain either the lazy-unopened or one complete bounded Deck catalogue");
-    assert.deepEqual([finalLifecycle.effectNodes, finalLifecycle.cardFlights, finalLifecycle.resultParticles], [0, 0, 0], "returning to the lobby must clear all transient presentation nodes");
+    assert.deepEqual([finalLifecycle.effectNodes, finalLifecycle.cardFlights, finalLifecycle.deckClones, finalLifecycle.deckTransforms, finalLifecycle.resultParticles], [0, 0, 0, 0, 0], "returning to the lobby must clear all transient presentation nodes");
     assert.equal(finalLifecycle.transientHidden && finalLifecycle.singletonSurfaces, true, "repeated matches must leave one hidden transient surface of each kind");
     assert.deepEqual(finalLifecycle.listeners, { queueStatus: 1, matchFound: 1, state: 1, gameOver: 1, disconnect: 1, connect: 1 }, "repeated matches must not accumulate Socket.IO listeners");
     assert.deepEqual(errors, [], errors.join("\n"));
@@ -829,6 +1034,599 @@ async function run() {
   } finally {
     await browser.close();
     await closeServer();
+  }
+}
+
+async function deckOrder(page) {
+  return page.locator("#builder-deck [data-deck-slot]").evaluateAll(elements => elements.map(element => element.dataset.cardKey).filter(Boolean));
+}
+
+async function selectedDeckWeapon(page) {
+  return page.locator('#weapon-options [role="radio"][aria-checked="true"]').getAttribute("data-weapon");
+}
+
+async function waitForDeckOrder(page, expected) {
+  await page.waitForFunction(order => JSON.stringify([...document.querySelectorAll("#builder-deck [data-deck-slot]")].map(slot => slot.dataset.cardKey).filter(Boolean)) === JSON.stringify(order), expected);
+}
+
+async function rememberDeckRoots(page) {
+  await page.evaluate(() => {
+    window.__deckRootRefs = {
+      slots: Object.fromEntries([...document.querySelectorAll("[data-deck-slot]")].map(node => [node.dataset.deckSlot, node])),
+      cards: Object.fromEntries([...document.querySelectorAll("[data-library-card]")].map(node => [node.dataset.libraryCard, node])),
+      weapons: Object.fromEntries([...document.querySelectorAll("[data-weapon-root]")].map(node => [node.dataset.weaponRoot, node])),
+      info: document.querySelector("#deck-info-modal"),
+      replacement: document.querySelector("#deck-replace-modal")
+    };
+  });
+}
+
+async function deckRootAudit(page) {
+  return page.evaluate(() => {
+    const refs = window.__deckRootRefs;
+    const same = (selector, key, expected) => [...document.querySelectorAll(selector)].every(node => expected[node.dataset[key]] === node);
+    return {
+      slots: document.querySelectorAll("[data-deck-slot]").length,
+      cards: document.querySelectorAll("[data-library-card]").length,
+      weapons: document.querySelectorAll("[data-weapon-root]").length,
+      info: document.querySelectorAll("#deck-info-modal").length,
+      replacement: document.querySelectorAll("#deck-replace-modal").length,
+      stable: Boolean(refs) && same("[data-deck-slot]", "deckSlot", refs.slots) && same("[data-library-card]", "libraryCard", refs.cards) && same("[data-weapon-root]", "weaponRoot", refs.weapons) && refs.info === document.querySelector("#deck-info-modal") && refs.replacement === document.querySelector("#deck-replace-modal")
+    };
+  });
+}
+
+async function assertDeckRootsStable(page, label) {
+  assert.deepEqual(await deckRootAudit(page), { slots: 6, cards: 29, weapons: 2, info: 1, replacement: 1, stable: true }, label);
+}
+
+async function waitForDeckSettled(page) {
+  await page.waitForFunction(() => {
+    const deckAnimations = document.getAnimations().filter(animation => {
+      const target = animation.effect?.target;
+      return animation.playState === "running" && target instanceof Element && (target.closest("#deck-screen") || target.closest(".deck-overlay"));
+    });
+    return deckAnimations.length === 0 && !document.querySelector(".deck-travel-clone, .deck-drag-avatar, .armory-filter-clone") && [...document.querySelectorAll("#builder-deck .deck-slot__select")].every(element => !element.style.transform);
+  });
+}
+
+async function assertNoDeckTransients(page, label) {
+  await waitForDeckSettled(page);
+  const state = await page.evaluate(() => ({
+    clones: document.querySelectorAll(".deck-travel-clone, .deck-drag-avatar, .armory-filter-clone").length,
+    transforms: [...document.querySelectorAll("#builder-deck .deck-slot__select, #card-library [data-library-card]")].filter(element => element.style.transform).length,
+    running: document.getAnimations().filter(animation => {
+      const target = animation.effect?.target;
+      return animation.playState === "running" && target instanceof Element && (target.closest("#deck-screen") || target.closest(".deck-overlay"));
+    }).length
+  }));
+  assert.deepEqual(state, { clones: 0, transforms: 0, running: 0 }, label);
+}
+
+async function exerciseArmoryMotion(page) {
+  const departureKey = await page.evaluate(() => Object.entries(window.GAME_DATA.cards).find(([, card]) => card.category === "crew")?.[0]);
+  assert.ok(departureKey, "Armory motion fixture requires a Crew card");
+  await page.locator(`[data-library-card="${departureKey}"]`).scrollIntoViewIfNeeded();
+  await page.evaluate(() => {
+    const state = { peak: 0, observations: [] };
+    const observer = new MutationObserver(records => {
+      const clones = records.flatMap(record => [...record.addedNodes]).filter(node => node instanceof Element).flatMap(node => node.matches(".armory-filter-clone") ? [node] : [...node.querySelectorAll(".armory-filter-clone")]);
+      for (const clone of clones) {
+        const rect = clone.getBoundingClientRect();
+        const viewport = document.querySelector("#deck-screen").getBoundingClientRect();
+        state.observations.push({
+          inert: clone.inert,
+          ariaHidden: clone.getAttribute("aria-hidden"),
+          stableKeyRemoved: !clone.hasAttribute("data-library-card"),
+          pointerEvents: getComputedStyle(clone).pointerEvents,
+          visibleDeparture: rect.width > 0 && rect.height > 0 && rect.bottom >= viewport.top && rect.top <= viewport.bottom
+        });
+      }
+      state.peak = Math.max(state.peak, document.querySelectorAll(".armory-filter-clone").length);
+    });
+    observer.observe(document.querySelector("#deck-screen"), { childList: true, subtree: true });
+    window.__armoryMotionAudit = { state, observer };
+  });
+  await page.locator('[data-deck-filter="attack"]').click();
+  await page.waitForFunction(() => window.__armoryMotionAudit?.state.peak > 0);
+  const positive = await page.evaluate(() => window.__armoryMotionAudit.state);
+  assert.ok(positive.peak >= 1 && positive.observations.length >= 1, "animated filtering must create at least one departure clone");
+  assert.equal(positive.observations.every(item => item.inert && item.ariaHidden === "true" && item.stableKeyRemoved && item.pointerEvents === "none" && item.visibleDeparture), true, "Armory departure clones must be inert, aria-hidden, keyless, pointer-inert, and sourced from visible cards");
+  await page.evaluate(() => {
+    document.querySelector('[data-deck-filter="crew"]').click();
+    document.querySelector('[data-deck-filter="magic"]').click();
+    const search = document.querySelector("#deck-search");
+    search.value = "ward";
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    search.value = "";
+    search.dispatchEvent(new Event("input", { bubbles: true }));
+    document.querySelector('[data-deck-filter="all"]').click();
+  });
+  await page.waitForFunction(() => !document.querySelector(".armory-filter-clone") && document.querySelectorAll("#card-library [data-library-card]:not([hidden])").length === 29 && document.querySelector('[data-deck-filter="all"]').getAttribute("aria-pressed") === "true" && !document.querySelector("#deck-search").value);
+  await page.waitForTimeout(240);
+  const complete = await page.evaluate(() => {
+    window.__armoryMotionAudit.observer.disconnect();
+    return { peak: window.__armoryMotionAudit.state.peak, live: document.querySelectorAll(".armory-filter-clone").length };
+  });
+  assert.ok(complete.peak >= 1, "rapid Armory input must retain positive departure-motion evidence");
+  assert.equal(complete.live, 0, "rapid search and filter input must clean every Armory departure clone");
+}
+
+async function beginReplacementMotionAudit(page, auditKey) {
+  await page.evaluate(key => {
+    window[key]?.observer?.disconnect();
+    const state = { peakIncoming: 0, peakOutgoing: 0, simultaneous: false, ariaHidden: true };
+    const sample = () => {
+      const incoming = [...document.querySelectorAll(".deck-travel-clone:not(.is-removing)")];
+      const outgoing = [...document.querySelectorAll(".deck-travel-clone.is-removing")];
+      state.peakIncoming = Math.max(state.peakIncoming, incoming.length);
+      state.peakOutgoing = Math.max(state.peakOutgoing, outgoing.length);
+      state.simultaneous ||= incoming.length > 0 && outgoing.length > 0;
+      state.ariaHidden &&= [...incoming, ...outgoing].every(clone => clone.getAttribute("aria-hidden") === "true");
+    };
+    const observer = new MutationObserver(sample);
+    observer.observe(document.body, { childList: true, subtree: true });
+    window[key] = { state, observer, sample };
+    sample();
+  }, auditKey);
+}
+
+async function endReplacementMotionAudit(page, auditKey) {
+  return page.evaluate(key => {
+    const audit = window[key];
+    audit.sample();
+    audit.observer.disconnect();
+    return {
+      ...audit.state,
+      liveIncoming: document.querySelectorAll(".deck-travel-clone:not(.is-removing)").length,
+      liveOutgoing: document.querySelectorAll(".deck-travel-clone.is-removing").length
+    };
+  }, auditKey);
+}
+
+async function assertReplacementCandidateUnlabeled(page, key, label) {
+  const presentation = await page.locator(`[data-library-card="${key}"]`).evaluate(element => ({
+    active: element.classList.contains("is-replacement-candidate"),
+    pseudoContent: getComputedStyle(element, "::after").content
+  }));
+  assert.equal(presentation.active, true, `${label} must retain the static candidate outline while the sheet is open`);
+  assert.equal(/choose a position/i.test(presentation.pseudoContent), false, `${label} must not render the retired candidate pseudo-label: ${presentation.pseudoContent}`);
+}
+
+async function assertReplacementCandidateCleared(page, key, label) {
+  assert.equal(await page.locator(`[data-library-card="${key}"]`).evaluate(element => element.classList.contains("is-replacement-candidate")), false, `${label} must clear replacement-candidate presentation`);
+}
+
+async function auditVisibleArmoryCards(page, label) {
+  const audit = await page.evaluate(() => {
+    const rendered = element => Boolean(element) && !element.hidden && element.getClientRects().length > 0 && getComputedStyle(element).display !== "none" && getComputedStyle(element).visibility !== "hidden";
+    const deck = new Set([...document.querySelectorAll("#builder-deck [data-deck-slot]")].map(slot => slot.dataset.cardKey).filter(Boolean));
+    const cards = [...document.querySelectorAll("#card-library [data-library-card]")].filter(rendered).map(element => {
+      const select = element.querySelector(".library-card__select");
+      const actions = element.querySelector(".library-card__actions");
+      const facts = [...element.querySelectorAll(".library-card__strengths b")];
+      const textRect = fact => {
+        const range = document.createRange();
+        range.selectNodeContents(fact);
+        return range.getBoundingClientRect();
+      };
+      const selectRect = select.getBoundingClientRect();
+      const factRects = facts.map(textRect);
+      const key = element.dataset.libraryCard;
+      return {
+        key,
+        inDeck: deck.has(key),
+        expanded: select.getAttribute("aria-expanded") === "true",
+        actionsVisible: rendered(actions),
+        selectHeight: selectRect.height,
+        rootHeight: element.getBoundingClientRect().height,
+        armoryFrame: Boolean(select.querySelector(".card-frame--armory")),
+        membershipInName: /in Deck \d at draw position \d/i.test(select.getAttribute("aria-label") || ""),
+        factCollision: factRects.some((rect, index) => index > 0 && factRects[index - 1].bottom > rect.top + 0.5),
+        factCardOverflow: factRects.some(rect => rect.bottom > selectRect.bottom - 4 || rect.left < selectRect.left + 2 || rect.right > selectRect.right - 2),
+        legacySignal: Boolean(element.querySelector(".library-card__membership, .library-card__action"))
+      };
+    });
+    const spread = values => values.length ? Math.max(...values) - Math.min(...values) : 0;
+    return {
+      count: cards.length,
+      selectHeightSpread: spread(cards.map(card => card.selectHeight)),
+      rootHeightSpread: spread(cards.map(card => card.rootHeight)),
+      expandedFailures: cards.filter(card => card.expanded || card.actionsVisible).map(card => card.key),
+      frameFailures: cards.filter(card => !card.armoryFrame).map(card => card.key),
+      membershipNameFailures: cards.filter(card => card.membershipInName !== card.inDeck).map(card => card.key),
+      factCollisionFailures: cards.filter(card => card.factCollision).map(card => card.key),
+      factCardOverflowFailures: cards.filter(card => card.factCardOverflow).map(card => card.key),
+      legacySignalFailures: cards.filter(card => card.legacySignal).map(card => card.key)
+    };
+  });
+  assert.ok(audit.count > 0, `${label} must expose visible Armory cards`);
+  assert.ok(audit.selectHeightSpread <= 1, `${label} Armory card controls must have uniform heights: ${JSON.stringify(audit)}`);
+  assert.ok(audit.rootHeightSpread <= 1, `${label} Armory card roots must have uniform heights: ${JSON.stringify(audit)}`);
+  assert.deepEqual(audit.expandedFailures, [], `${label} must keep Info and Choose Position / In Deck signals collapsed until a card is selected`);
+  assert.deepEqual(audit.frameFailures, [], `${label} cards must share the Armory frame anatomy`);
+  assert.deepEqual(audit.membershipNameFailures, [], `${label} collapsed card names must preserve deck membership accessibly`);
+  assert.deepEqual(audit.factCollisionFailures, [], `${label} Armory strength rows must not collide`);
+  assert.deepEqual(audit.factCardOverflowFailures, [], `${label} Armory strength text must remain inside its card face`);
+  assert.deepEqual(audit.legacySignalFailures, [], `${label} must not render retired always-visible membership or Choose Position footers`);
+  return audit;
+}
+
+async function auditDeckLayout(page, width, height, expectedColumns, capturePath) {
+  await page.setViewportSize({ width, height });
+  await page.evaluate(() => { document.querySelector("#deck-screen").scrollTop = 0; });
+  await page.waitForFunction(columns => {
+    const grid = document.querySelector('[data-armory-grid="attack"]');
+    return grid && getComputedStyle(grid).gridTemplateColumns.split(/\s+/).filter(Boolean).length === columns;
+  }, expectedColumns);
+  const layout = await page.evaluate(() => {
+    const visible = element => element.getClientRects().length > 0;
+    const actions = [...document.querySelectorAll("#deck-screen button:not([disabled]), #deck-screen input:not([disabled]), #deck-screen select:not([disabled])")].filter(visible);
+    const cards = [...document.querySelectorAll("#card-library [data-library-card]")].filter(visible);
+    const rows = [...document.querySelectorAll("#builder-deck .deck-cycle-cards")];
+    const nestedScrollers = [...document.querySelectorAll("#deck-screen *")].filter(element => {
+      const overflow = getComputedStyle(element).overflowY;
+      return (overflow === "auto" || overflow === "scroll") && element.scrollHeight > element.clientHeight + 1;
+    });
+    const art = document.querySelector("#card-library .card-frame--armory .card-frame__art");
+    const name = document.querySelector("#card-library .card-frame--armory .card-frame__body strong");
+    const strength = document.querySelector("#card-library .library-card__strengths b");
+    const weaponCenterOffsets = [...document.querySelectorAll("#weapon-options .card-frame--armory")].map(frame => {
+      const art = frame.querySelector(".card-frame__art").getBoundingClientRect();
+      const frameRect = frame.getBoundingClientRect();
+      return Math.abs((art.left + art.width / 2) - (frameRect.left + frameRect.width / 2));
+    });
+    const deckRoots = [...document.querySelectorAll("#builder-deck [data-deck-slot]")];
+    const deckFaces = deckRoots.map(slot => slot.querySelector(".deck-slot__select"));
+    const armoryFaces = cards.map(card => card.querySelector(".library-card__select"));
+    const spread = values => Math.max(...values) - Math.min(...values);
+    return {
+      horizontalOverflow: document.documentElement.scrollWidth > document.documentElement.clientWidth || document.querySelector("#deck-screen").scrollWidth > document.querySelector("#deck-screen").clientWidth,
+      columns: getComputedStyle(document.querySelector('[data-armory-grid="attack"]')).gridTemplateColumns.split(/\s+/).filter(Boolean).length,
+      rowSizes: rows.map(row => row.querySelectorAll(":scope > [data-deck-slot]").length),
+      rowColumns: rows.map(row => getComputedStyle(row).gridTemplateColumns.split(/\s+/).filter(Boolean).length),
+      labels: [...document.querySelectorAll(".deck-cycle-row__label")].map(element => element.textContent.replace(/\s+/g, " ").trim()),
+      orderLabels: [...document.querySelectorAll("#builder-deck .deck-slot-order")].map(element => element.textContent.trim()),
+      summary: ["deck-average-cost", "deck-attack-count", "deck-crew-count", "deck-magic-count", "deck-readiness"].every(id => Boolean(document.getElementById(id)?.textContent.trim())),
+      deckTabs: document.querySelectorAll('#deck-tabs [role="tab"]').length,
+      selectedTabs: document.querySelectorAll('#deck-tabs [role="tab"][aria-selected="true"]').length,
+      clippedActions: actions.filter(element => { const rect = element.getBoundingClientRect(); return rect.left < -1 || rect.right > innerWidth + 1; }).length,
+      smallestAction: Math.round(Math.min(...actions.map(element => Math.min(element.getBoundingClientRect().width, element.getBoundingClientRect().height))) * 10) / 10,
+      undersizedActions: actions.map(element => {
+        const rect = element.getBoundingClientRect();
+        return { selector: element.id ? `#${element.id}` : `${element.tagName.toLowerCase()}.${element.className}`.replace(/\s+/g, "."), width: Math.round(rect.width * 10) / 10, height: Math.round(rect.height * 10) / 10 };
+      }).filter(({ width, height }) => Math.min(width, height) < 48),
+      smallestCard: Math.min(...cards.map(element => element.getBoundingClientRect().width)),
+      artSize: art ? Math.min(art.getBoundingClientRect().width, art.getBoundingClientRect().height) : 0,
+      nameSize: name ? Number.parseFloat(getComputedStyle(name).fontSize) : 0,
+      strengthSize: strength ? Number.parseFloat(getComputedStyle(strength).fontSize) : 0,
+      weaponCenterOffsets,
+      weaponStats: [...document.querySelectorAll("#weapon-options [data-weapon-root]")].map(root => [...root.querySelectorAll(".weapon-option__strengths b")].map(stat => stat.textContent.trim())),
+      deckRootHeightSpread: spread(deckRoots.map(root => root.getBoundingClientRect().height)),
+      deckFaceHeightSpread: spread(deckFaces.map(face => face.getBoundingClientRect().height)),
+      armoryRootHeightSpread: spread(cards.map(card => card.getBoundingClientRect().height)),
+      armoryFaceHeightSpread: spread(armoryFaces.map(face => face.getBoundingClientRect().height)),
+      sharedFaceHeightDelta: Math.abs(deckFaces[0].getBoundingClientRect().height - armoryFaces[0].getBoundingClientRect().height),
+      sharedDeckFrames: deckFaces.every(face => face.querySelector(".card-frame--armory")),
+      hiddenDisclosurePanels: [...document.querySelectorAll("#builder-deck .deck-slot__actions, #card-library .library-card__actions")].every(panel => panel.hidden && !visible(panel)),
+      nestedScrollers: nestedScrollers.map(element => element.id || element.className),
+      switcherBeforeArmory: Boolean(document.querySelector("#deck-tabs").compareDocumentPosition(document.querySelector("#card-library")) & Node.DOCUMENT_POSITION_FOLLOWING),
+      manualSaveControls: document.querySelectorAll("#save-deck, #restore-deck, #deck-save-rail").length,
+      dragControls: document.querySelectorAll('[data-slot-action="drag"], .deck-slot__drag-handle').length
+    };
+  });
+  assert.equal(layout.horizontalOverflow, false, `${width}px Deck must not clip horizontally`);
+  assert.equal(layout.columns, expectedColumns, `${width}px Armory column count`);
+  assert.deepEqual(layout.rowSizes, [3, 3], "Deck must expose two labeled rows of three stable slots");
+  assert.deepEqual(layout.rowColumns, [3, 3], "Deck rows must retain the 3x2 visual arrangement");
+  assert.ok(layout.labels[0]?.startsWith("OPENING HAND") && layout.labels[1]?.startsWith("NEXT IN CYCLE"), "draw-order rows must remain explicitly labeled");
+  assert.deepEqual(layout.orderLabels, ["#1", "#2", "#3", "#4", "#5", "#6"], "all draw positions must include a # label");
+  assert.equal(layout.summary && layout.switcherBeforeArmory, true, "deck switcher and summary must remain above the Armory");
+  assert.deepEqual([layout.deckTabs, layout.selectedTabs, layout.manualSaveControls], [5, 1, 0], "Deck must expose five tabs, one selected deck, and no manual Save rail");
+  assert.equal(layout.clippedActions, 0, `${width}px Deck actions must remain in the viewport`);
+  assert.ok(layout.smallestAction >= 48, `${width}px Deck actions must retain 48px targets: ${JSON.stringify(layout.undersizedActions)}`);
+  assert.ok(layout.smallestCard >= 136, `${width}px Armory cards must remain approximately 140px wide or larger`);
+  assert.ok(layout.artSize >= 88, `${width}px Armory art must remain visually dominant`);
+  assert.ok(layout.nameSize >= 14 && layout.strengthSize >= 12, `${width}px Armory comparison text must remain readable`);
+  assert.ok(layout.weaponCenterOffsets.every(offset => offset <= 1), `${width}px Cannon and Volley portraits must remain centered: ${JSON.stringify(layout.weaponCenterOffsets)}`);
+  assert.equal(layout.weaponStats.length, 2, "both permanent weapons must expose comparison stats");
+  assert.equal(layout.weaponStats.every(stats => stats.length >= 2 && stats.every(Boolean)), true, "permanent weapon stats must be visible and populated");
+  assert.ok(layout.deckRootHeightSpread <= 1 && layout.deckFaceHeightSpread <= 1 && layout.armoryRootHeightSpread <= 1 && layout.armoryFaceHeightSpread <= 1 && layout.sharedFaceHeightDelta <= 1, `${width}px collapsed Deck and Armory cards must share one uniform height: ${JSON.stringify(layout)}`);
+  assert.equal(layout.sharedDeckFrames && layout.hiddenDisclosurePanels, true, `${width}px selected cards must share Armory anatomy and keep action overlays collapsed`);
+  assert.deepEqual(layout.nestedScrollers, [], "Deck must use its one screen scroller without nested scrolling regions");
+  assert.equal(layout.dragControls, 0, `${width}px Deck must not expose a separate drag control`);
+  await auditVisibleArmoryCards(page, `${width}px Deck layout`);
+  const stickyGeometry = await page.evaluate(async () => {
+    const screen = document.querySelector("#deck-screen");
+    const header = screen.querySelector(".deck-screen-header");
+    const toolbar = document.querySelector("#armory-toolbar");
+    const position = getComputedStyle(toolbar).position;
+    const screenRect = screen.getBoundingClientRect();
+    const toolbarOffset = screen.scrollTop + toolbar.getBoundingClientRect().top - screenRect.top + 1;
+    screen.scrollTop = Math.min(Math.max(0, screen.scrollHeight - screen.clientHeight), Math.max(700, toolbarOffset));
+    await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const navReachable = ["battle-tab", "open-deck"].every(id => {
+      const control = document.getElementById(id);
+      const rect = control.getBoundingClientRect();
+      return document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2)?.closest(`#${id}`) === control;
+    });
+    return {
+      position,
+      headerBottom: header.getBoundingClientRect().bottom,
+      toolbarTop: toolbar.getBoundingClientRect().top,
+      navReachable
+    };
+  });
+  if (stickyGeometry.position === "sticky") assert.ok(stickyGeometry.toolbarTop >= stickyGeometry.headerBottom - 1, `${width}px sticky Armory toolbar must remain below the responsive Deck header: ${JSON.stringify(stickyGeometry)}`);
+  assert.equal(stickyGeometry.navReachable, true, `${width}px persistent Battle and Deck tabs must remain pointer-reachable above Deck surfaces`);
+  await page.evaluate(() => { document.querySelector("#deck-screen").scrollTop = 0; });
+  if (capturePath) await page.screenshot({ path: capturePath });
+  return layout;
+}
+
+async function exerciseDeckInfoCoverage(page) {
+  const infoAudit = await page.evaluate(() => {
+    const controls = [...document.querySelectorAll('#builder-deck [data-slot-action="info"], #card-library [data-card-action="info"], #weapon-options [data-weapon-action="info"]')];
+    const failures = controls.map(control => {
+      return {
+        label: control.getAttribute("aria-label"),
+        text: control.textContent.trim(),
+        valid: control.textContent.trim() === "INFO"
+      };
+    }).filter(entry => !entry.valid);
+    return { count: controls.length, failures, legacyGlyphs: controls.filter(control => control.textContent.trim().toLowerCase() === "i").length };
+  });
+  assert.equal(infoAudit.count, 37, "six Deck cards, 29 Armory cards, and two weapons must expose Info controls");
+  assert.deepEqual(infoAudit.failures, [], `Info controls must use a readable INFO label: ${JSON.stringify(infoAudit.failures)}`);
+  assert.equal(infoAudit.legacyGlyphs, 0, "Deck Info controls must not use the retired i-only glyph");
+
+  await page.locator('[data-deck-slot="0"] [data-slot-action="select"]').click();
+  const deckDisclosure = await page.locator('[data-deck-slot="0"] .deck-slot__actions').evaluate(element => {
+    const [info, remove] = element.querySelectorAll("button");
+    const root = element.closest("[data-deck-slot]");
+    return {
+      rootHeight: root.getBoundingClientRect().height,
+      targets: [info, remove].map(control => Math.min(control.getBoundingClientRect().width, control.getBoundingClientRect().height)),
+      order: info.getBoundingClientRect().bottom <= remove.getBoundingClientRect().top + 1
+    };
+  });
+  assert.ok(deckDisclosure.targets.every(size => size >= 48) && deckDisclosure.order, "expanded Deck Info and Remove must be ordered and retain 48px targets");
+  await page.keyboard.press("Escape");
+
+  const armoryFace = page.locator('[data-library-card="phaseShield"] [data-card-action="toggle"]');
+  const collapsedHeight = await page.locator('[data-library-card="phaseShield"]').evaluate(element => element.getBoundingClientRect().height);
+  await armoryFace.click();
+  const armoryDisclosure = await page.locator('[data-library-card="phaseShield"] .library-card__actions').evaluate(element => {
+    const [info, choose] = element.querySelectorAll("button");
+    const root = element.closest("[data-library-card]");
+    return {
+      rootHeight: root.getBoundingClientRect().height,
+      targets: [info, choose].map(control => Math.min(control.getBoundingClientRect().width, control.getBoundingClientRect().height)),
+      order: info.getBoundingClientRect().bottom <= choose.getBoundingClientRect().top + 1
+    };
+  });
+  assert.ok(armoryDisclosure.targets.every(size => size >= 48) && armoryDisclosure.order, "expanded Armory Info and Choose Position must be ordered and retain 48px targets");
+  assert.ok(Math.abs(armoryDisclosure.rootHeight - collapsedHeight) <= 1, "the action overlay must not change an Armory card's uniform root height");
+  await armoryFace.click();
+
+  const failures = await page.evaluate(() => {
+    const problems = [];
+    const inspect = (source, key, origin, definition, expectedStats) => {
+      origin.click();
+      const categoryKey = source === "weapon" ? "attack" : definition.category;
+      const expectedMeta = `${window.GAME_DATA.categories[categoryKey].name.toUpperCase()} / ${(source === "weapon" ? "weapon" : definition.type).toUpperCase()}`;
+      const actual = {
+        name: document.querySelector("#deck-info-name").textContent,
+        meta: document.querySelector("#deck-info-meta").textContent,
+        cost: document.querySelector("#deck-info-cost").textContent,
+        description: document.querySelector("#deck-info-description").textContent,
+        stats: [...document.querySelectorAll("#deck-info-stats [role=listitem]")].map(element => element.textContent),
+        art: document.querySelector("#deck-info-art").classList.contains(`pixel-${source}-${key}`),
+        membership: document.querySelector("#deck-info-membership").textContent
+      };
+      if (actual.name !== definition.name.toUpperCase() || actual.meta !== expectedMeta || actual.cost !== `${definition.cost} TAPS` || actual.description !== definition.description || JSON.stringify(actual.stats) !== JSON.stringify(expectedStats) || !actual.art || !actual.membership) problems.push({ source, key, actual });
+      document.querySelector("#close-deck-info").click();
+    };
+    for (const [key, card] of Object.entries(window.GAME_DATA.cards)) {
+      const root = document.querySelector(`[data-library-card="${key}"]`);
+      root.querySelector('[data-card-action="toggle"]').click();
+      inspect("card", key, root.querySelector('[data-card-action="info"]'), card, window.GAME_DATA.cardStats[key]);
+      root.querySelector('[data-card-action="toggle"]').click();
+    }
+    for (const [key, weapon] of Object.entries(window.GAME_DATA.weapons)) inspect("weapon", key, document.querySelector(`[data-weapon-root="${key}"] [data-weapon-action="info"]`), weapon, window.GAME_DATA.weaponStats[key]);
+    return problems;
+  });
+  assert.deepEqual(failures, [], "all 29 cards and both weapons must expose complete reusable Info content");
+
+  await armoryFace.click();
+  const origin = page.locator('[data-library-card="phaseShield"] [data-card-action="info"]');
+  await origin.focus();
+  await origin.click();
+  await assertVisible(page, "#deck-info-modal");
+  await page.waitForFunction(() => document.activeElement?.id === "deck-info-name");
+  assert.equal(await page.locator(".app-shell").evaluate(element => element.inert), true, "Info must inert the app shell immediately");
+  await page.keyboard.press("Tab");
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "close-deck-info", "Info Tab must wrap to its visible Close control");
+  await page.keyboard.press("Shift+Tab");
+  assert.equal(await page.evaluate(() => document.activeElement?.id), "close-deck-info", "Info reverse Tab must remain contained on its only interactive control");
+  await page.keyboard.press("Escape");
+  await page.locator("#deck-info-modal").waitFor({ state: "hidden" });
+  await page.waitForFunction(() => document.activeElement?.matches('[data-library-card="phaseShield"] [data-card-action="info"]'));
+  await origin.click();
+  await page.locator("#deck-info-modal").dispatchEvent("pointerdown");
+  await page.locator("#deck-info-modal").waitFor({ state: "hidden" });
+  assert.equal(await page.locator(".app-shell").evaluate(element => element.inert), false, "closing Info must restore background interaction");
+  await armoryFace.click();
+}
+
+async function pointerDragDeckCard(page, from, to, mode = "commit") {
+  const source = page.locator(`[data-deck-slot="${from}"] [data-slot-action="select"]`);
+  const target = page.locator(`[data-deck-slot="${to}"]`);
+  await source.scrollIntoViewIfNeeded();
+  await target.scrollIntoViewIfNeeded();
+  const [sourceBox, targetBox] = await Promise.all([source.boundingBox(), target.boundingBox()]);
+  assert.ok(sourceBox && targetBox, "pointer reorder controls must have visible geometry");
+  const start = { x: sourceBox.x + sourceBox.width / 2, y: sourceBox.y + sourceBox.height / 2 };
+  const destination = { x: targetBox.x + targetBox.width / 2, y: targetBox.y + targetBox.height / 2 };
+  await page.mouse.move(start.x, start.y);
+  await page.mouse.down();
+  await page.mouse.move(start.x + 10, start.y, { steps: 2 });
+  await page.waitForFunction(() => document.querySelectorAll(".deck-drag-avatar").length === 1);
+  if (mode === "cancel") {
+    await page.keyboard.press("Escape");
+    await page.mouse.up();
+  } else if (mode === "invalid") {
+    const viewportHeight = page.viewportSize()?.height || 700;
+    await page.mouse.move(2, Math.max(2, Math.min(viewportHeight - 2, start.y)), { steps: 3 });
+    await page.mouse.up();
+  } else {
+    await page.mouse.move(destination.x, destination.y, { steps: 4 });
+    await page.waitForFunction(index => document.querySelector(`[data-deck-slot="${index}"]`)?.classList.contains("is-drop-target"), to);
+    await page.mouse.up();
+  }
+  await page.waitForFunction(() => !document.querySelector(".deck-drag-avatar") && [...document.querySelectorAll("#builder-deck .deck-slot__select")].every(element => !element.style.transform));
+}
+
+async function touchDragDeckCard(context, page, from, to, mode = "commit") {
+  const source = page.locator(`[data-deck-slot="${from}"] [data-slot-action="select"]`);
+  const target = page.locator(`[data-deck-slot="${to}"]`);
+  await source.scrollIntoViewIfNeeded();
+  await target.scrollIntoViewIfNeeded();
+  const [sourceBox, targetBox] = await Promise.all([source.boundingBox(), target.boundingBox()]);
+  assert.ok(sourceBox && targetBox, "touch reorder controls must have visible geometry");
+  const touchPoint = (box, id = 1) => ({ x: box.x + box.width / 2, y: box.y + box.height / 2, id, radiusX: 4, radiusY: 4, force: 1 });
+  const client = await context.newCDPSession(page);
+  try {
+    await client.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [touchPoint(sourceBox)] });
+    await page.waitForFunction(() => document.querySelectorAll(".deck-drag-avatar").length === 1);
+    await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [touchPoint(targetBox)] });
+    await page.waitForFunction(index => document.querySelector(`[data-deck-slot="${index}"]`)?.classList.contains("is-drop-target"), to);
+    await client.send("Input.dispatchTouchEvent", { type: mode === "cancel" ? "touchCancel" : "touchEnd", touchPoints: [] });
+    await page.waitForFunction(() => !document.querySelector(".deck-drag-avatar") && [...document.querySelectorAll("#builder-deck .deck-slot__select")].every(element => !element.style.transform));
+  } finally {
+    await client.detach();
+  }
+}
+
+async function touchScrollDeckFromCard(context, page, index) {
+  const beforeOrder = await deckOrder(page);
+  const card = page.locator(`[data-deck-slot="${index}"] [data-slot-action="select"]`);
+  await card.scrollIntoViewIfNeeded();
+  const box = await card.boundingBox();
+  assert.ok(box, "touch-scroll fixture must expose visible card geometry");
+  const start = { x: box.x + box.width / 2, y: box.y + box.height / 2, id: 1, radiusX: 4, radiusY: 4, force: 1 };
+  const initialScroll = await page.locator("#deck-screen").evaluate(element => element.scrollTop);
+  const client = await context.newCDPSession(page);
+  try {
+    await client.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [start] });
+    for (const distance of [18, 42, 72, 105]) {
+      await client.send("Input.dispatchTouchEvent", { type: "touchMove", touchPoints: [{ ...start, y: start.y - distance }] });
+      await page.waitForTimeout(12);
+    }
+    await client.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+    await page.waitForFunction(before => document.querySelector("#deck-screen").scrollTop > before + 40, initialScroll);
+    await page.waitForTimeout(300);
+  } finally {
+    await client.detach();
+  }
+  const after = await page.evaluate(() => ({
+    clones: document.querySelectorAll(".deck-drag-avatar").length,
+    transforms: [...document.querySelectorAll("#builder-deck .deck-slot__select")].filter(element => element.style.transform).length,
+    order: [...document.querySelectorAll("#builder-deck [data-deck-slot]")].map(slot => slot.dataset.cardKey).filter(Boolean)
+  }));
+  assert.deepEqual(after, { clones: 0, transforms: 0, order: beforeOrder }, "a vertical swipe starting on a Deck card must scroll naturally without starting or mutating a drag");
+}
+
+async function exerciseDeckStorageFailure(browser, port, errors) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: "reduce" });
+  await context.addInitScript(() => {
+    const nativeSetItem = Storage.prototype.setItem;
+    window.__allowStorageWrites = sessionStorage.getItem("taptics-storage-recovered") === "true";
+    Storage.prototype.setItem = function controlledSetItem(key, value) {
+      if (!window.__allowStorageWrites) throw new DOMException("Storage unavailable", "QuotaExceededError");
+      return nativeSetItem.call(this, key, value);
+    };
+  });
+  const page = await context.newPage();
+  page.on("console", message => { if (message.type() === "error") errors.push(`storage console: ${message.text()}`); });
+  page.on("pageerror", error => errors.push(`storage page: ${error.message}`));
+  page.on("requestfailed", request => errors.push(`storage network: ${request.url()} ${request.failure()?.errorText || "failed"}`));
+  page.on("response", response => { if (response.status() >= 400) errors.push(`storage http ${response.status()}: ${response.url()}`); });
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
+    const savedLobby = await page.locator("#loadout-deck [data-card-key]").evaluateAll(elements => elements.map(element => element.dataset.cardKey));
+    await page.locator("#open-deck").click();
+    const replacement = await page.evaluate(() => Object.keys(window.GAME_DATA.cards).find(key => !window.GAME_DATA.defaultDeck.includes(key)));
+    await page.locator(`[data-library-card="${replacement}"] [data-card-action="toggle"]`).click();
+    await page.locator(`[data-library-card="${replacement}"] [data-card-action="choose"]`).click();
+    await page.locator('[data-replace-slot="0"]').click();
+    await page.waitForFunction(() => document.querySelector("#deck-status")?.dataset.state === "error");
+    const failedDraft = await deckOrder(page);
+    assert.equal(failedDraft.length, 6, "a failed autosave must retain the valid editor state in memory");
+    assert.equal(await page.locator("#save-deck, #restore-deck").count(), 0, "storage failure must not reintroduce manual Save controls");
+    await page.locator("#battle-tab").click();
+    assert.deepEqual(await page.locator("#loadout-deck [data-card-key]").evaluateAll(elements => elements.map(element => element.dataset.cardKey)), savedLobby, "failed persistence must leave the battle loadout unchanged");
+    await page.locator("#open-deck").click();
+    assert.deepEqual(await deckOrder(page), failedDraft, "the failed in-memory edit must remain editable");
+    await page.evaluate(() => {
+      window.__allowStorageWrites = true;
+      sessionStorage.setItem("taptics-storage-recovered", "true");
+    });
+    await page.locator('[data-weapon="volley"]').click();
+    await page.waitForFunction(() => document.querySelector("#deck-status")?.dataset.state === "saved");
+    assert.deepEqual(await page.evaluate(() => {
+      const saved = JSON.parse(localStorage.getItem("taptics-prototype-v3"));
+      return { deck: saved.loadouts[0].deck, weapon: saved.loadouts[0].weapon, draft: saved.loadouts[0].deckDraft };
+    }), { deck: failedDraft, weapon: "volley", draft: null }, "the next mutation must retry autosave and persist the retained edit after storage recovers");
+    await page.reload({ waitUntil: "networkidle" });
+    await page.locator("#open-deck").click();
+    assert.deepEqual(await deckOrder(page), failedDraft, "the recovered autosave must survive reload");
+    assert.equal(await selectedDeckWeapon(page), "volley", "the mutation that retried autosave must survive reload");
+  } finally {
+    await context.close();
+  }
+}
+
+async function exercisePartialDeckPacking(browser, port, errors) {
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 }, reducedMotion: "reduce" });
+  const page = await context.newPage();
+  page.on("console", message => { if (message.type() === "error") errors.push(`partial-deck console: ${message.text()}`); });
+  page.on("pageerror", error => errors.push(`partial-deck page: ${error.message}`));
+  try {
+    await page.goto(`http://127.0.0.1:${port}/`, { waitUntil: "networkidle" });
+    await page.locator("#open-deck").click();
+    for (const expectedLength of [5, 4]) {
+      await page.locator('[data-deck-slot="0"] [data-slot-action="select"]').click();
+      await page.locator('[data-deck-slot="0"] [data-slot-action="remove"]').click();
+      await page.waitForFunction(length => document.querySelectorAll("#builder-deck [data-deck-slot][data-card-key]:not([data-card-key=''])").length === length, expectedLength);
+    }
+    const packing = await page.evaluate(() => ({
+      slots: document.querySelectorAll("#builder-deck [data-deck-slot]").length,
+      deckLength: [...document.querySelectorAll("#builder-deck [data-deck-slot]")].filter(slot => slot.dataset.cardKey).length,
+      empties: [...document.querySelectorAll('#builder-deck [data-deck-slot]:not([data-card-key]), #builder-deck [data-deck-slot][data-card-key=""]')].map(slot => {
+        const control = slot.querySelector('[data-slot-action="empty"]');
+        return { index: Number(slot.dataset.deckSlot), disabled: control.disabled, label: control.getAttribute("aria-label"), copy: control.querySelector("span").textContent };
+      })
+    }));
+    assert.deepEqual(packing, {
+      slots: 6,
+      deckLength: 4,
+      empties: [
+        { index: 4, disabled: false, label: "Empty draw position 5. Choose a card from the Armory.", copy: "ADD CARD" },
+        { index: 5, disabled: true, label: "Empty draw position 6. Fill draw position 5 first.", copy: "FILL #5 FIRST" }
+      ]
+    }, "partial drafts must keep six stable roots while enabling only the next packed position and labeling later empties");
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("taptics-prototype-v3")).loadouts[0].deckDraft.deck.length), 4, "partial edits must auto-save inside their deck slot without replacing its last complete loadout");
+    const insertion = await page.evaluate(() => Object.keys(window.GAME_DATA.cards).find(key => ![...document.querySelectorAll("#builder-deck [data-card-key]")].some(slot => slot.dataset.cardKey === key)));
+    await page.locator(`[data-library-card="${insertion}"] [data-card-action="toggle"]`).click();
+    await page.locator(`[data-library-card="${insertion}"] [data-card-action="choose"]`).click();
+    assert.deepEqual(await page.locator("#deck-replacement-options .replacement-slot__position").allTextContents(), ["INSERT AS #1", "INSERT AS #2", "INSERT AS #3", "INSERT AS #4", "INSERT AS #5"], "partial decks must offer each packed insertion position explicitly");
+    await page.locator('[data-replace-slot="2"]').click();
+    await page.waitForFunction(() => document.querySelectorAll("#builder-deck [data-deck-slot][data-card-key]:not([data-card-key=''])").length === 5);
+    assert.equal((await deckOrder(page))[2], insertion, "partial position selection must insert at the chosen # position");
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("taptics-prototype-v3")).loadouts[0].deckDraft.deck.length), 5, "the inserted partial edit must auto-save immediately");
+  } finally {
+    await context.close();
   }
 }
 

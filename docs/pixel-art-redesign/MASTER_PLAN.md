@@ -18,7 +18,7 @@ This directory is the durable implementation plan for the medieval pixel-art red
 | 2 | Shared primitives and lobby/navigation | Complete |
 | 3 | Battle, three-card alignment, recent event feedback | Complete |
 | 4 | Complete art, effect families, full display-name refactor | Complete |
-| 5 | Deck builder | Complete |
+| 5 | Stacked five-loadout Deck builder, autosave/drafts, shared art-first cards, position choice, reorder, and Info | Complete |
 | 6 | Results and lifecycle states | Complete |
 | 7 | Accessibility, performance, cleanup, final QA | Complete |
 
@@ -30,6 +30,9 @@ This directory is the durable implementation plan for the medieval pixel-art red
 - Attack, Crew, and Magic each allow one unfinished commitment; weapon shares Attack.
 - Selected weapon only; distinct Crew and Magic zones; eight structure slots.
 - Stable delegated hand input and server-authoritative snapshots.
+- Five switchable autosaved loadout records; each incomplete per-deck draft leaves its last valid complete battle snapshot authoritative.
+- Stable six-slot 3x2 Deck tray, 29-root responsive Armory, two weapon roots with basic stats, shared fixed-height Deck/Armory anatomy, click-expanded Info plus choose/membership/remove actions, visible `#1`-`#6` order, explicit atomic position selection, single-step Undo, and pointer/touch/keyboard reorder without arrows.
+- Deck Info and position choice remain separate bounded dialogs; Armory browsing reuses `GAME_DATA`, preserves root identity, and supports search/filter/sort/grouping without a second registry.
 - Scalable viewport, visible focus, non-color state grammar, large targets, restrained live status, and reduced-motion equivalence.
 - Deterministic 69-sprite coverage, fixed atlas topology, explicit per-sprite pixel scale, and uniform coarse-pixel blocks.
 

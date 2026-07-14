@@ -22,7 +22,8 @@ Double Taps multiplies passive, Bellows Guild (`tapForge`), Alchemist's Furnace 
 ## Loadout and cycle
 
 - A loadout is exactly six unique own-property catalogue keys and one permanent Cannon or Volley. Malformed, short, oversized, duplicate, unknown, or inherited-key card arrays fall back as a whole to the default deck; invalid weapons fall back independently to Cannon.
-- Saved card order is authoritative for the opening three-card hand and the remaining ordered queue. Deck reordering therefore changes draw order without changing any card rule.
+- The client may keep five local loadout records and an optional partial draft for each, but match creation sends only the selected active record's last complete six-card deck and weapon. Autosaving an incomplete edit cannot change battle authority until that record is complete.
+- The active complete card order is authoritative for the opening three-card hand and the remaining ordered queue. Deck reordering therefore changes draw order without changing any card rule.
 - Three cards are visible. The remaining three form an ordered queue.
 - A card must first be placed into its category. Placement removes it from the hand, records `{ key, slot }`, leaves that slot blank, and spends no tap.
 - One card may be staged in each category simultaneously. Before its first tap, it can be swapped for another same-category hand card; the old card returns to its original slot and the new card reserves its own slot.

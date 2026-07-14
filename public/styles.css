@@ -25,6 +25,11 @@
   --siege-grid: 4px;
   --siege-shadow-offset: 4px;
   --motion-press: 80ms;
+  --motion-hover: 140ms;
+  --motion-state: 160ms;
+  --motion-spatial: 220ms;
+  --motion-dialog: 200ms;
+  --motion-ease-out: cubic-bezier(.2,.8,.2,1);
   --motion-deploy: 220ms;
   --motion-impact: 180ms;
   --motion-delta: 520ms;
@@ -226,25 +231,6 @@ button, a { -webkit-tap-highlight-color: transparent; }
 .battle-read small { color: var(--acid); font: 700 6px var(--mono); }
 .battle-read p { color: #a9afb8; font-size: 9px; line-height: 1.45; margin: 4px 0 0; }
 .result-card .primary-cta { margin-top: 4px; }
-.deck-builder-modal { width: min(100%, 440px); max-height: calc(100dvh - 20px); overflow-y: auto; border: 1px solid var(--line); background: #0d121b; padding: 20px 16px; box-shadow: 0 30px 80px #000; }
-.deck-builder-modal > header { display: flex; justify-content: space-between; align-items: start; }
-.deck-builder-modal h2 { font-size: 30px; letter-spacing: -.055em; margin: 0; }
-.deck-builder-modal > header > button { width: 32px; height: 32px; border: 1px solid var(--line); background: #141b25; color: var(--muted); cursor: pointer; }
-.deck-builder-copy { color: var(--muted); font-size: 9px; line-height: 1.55; margin: 10px 0 15px; }
-.weapon-builder, .builder-selection { border: 1px solid var(--line); background: #111721; padding: 11px; margin-bottom: 10px; }
-.weapon-options { display: grid; grid-template-columns: repeat(2,1fr); gap: 6px; margin-top: 9px; }
-.weapon-options button { min-height: 48px; border: 1px solid #3c4654; background: #171e29; color: var(--ink); font-size: 10px; font-weight: 800; cursor: pointer; }
-.weapon-options button small { display: block; color: var(--muted); font: 400 6px var(--mono); margin-top: 4px; }
-.weapon-options button.selected { border-color: var(--acid); color: var(--acid); background: #202719; }
-.builder-deck { display: grid; grid-template-columns: repeat(6,1fr); gap: 4px; margin-top: 9px; }
-.card-library-wrap { margin: 15px 0; }
-.card-library { display: grid; grid-template-columns: repeat(2,1fr); gap: 6px; margin-top: 9px; }
-.library-card { --card-color: #8491a1; min-height: 92px; border: 1px solid #303946; background: #121823; color: var(--ink); padding: 9px; text-align: left; position: relative; cursor: pointer; }
-.library-card.selected { border-color: var(--card-color); box-shadow: inset 0 0 20px color-mix(in srgb,var(--card-color) 14%,transparent); }
-.library-card b, .library-card small { display: block; }
-.library-card > b { margin-top: 7px; font-size: 9px; }
-.library-card > small { color: #89929f; font-size: 6px; line-height: 1.4; margin-top: 4px; }
-.deck-builder-modal > .primary-cta:disabled { filter: grayscale(1); opacity: .45; cursor: default; }
 .text-button { width: 100%; border: 0; background: transparent; color: var(--muted); font: 700 8px var(--mono); padding: 14px; cursor: pointer; }
 .toast { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); z-index: 30; width: min(calc(100% - 30px),420px); padding: 11px; border: 1px solid var(--orange); color: var(--orange); background: #141017; text-align: center; font: 700 8px var(--mono); pointer-events: none; }
 body.menu-active .toast { bottom: calc(92px + env(safe-area-inset-bottom)); }
@@ -324,26 +310,12 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 
 .action-card .action-progress, .weapon-card .action-progress { height: 6px; }
 .action-card.pending::after { font-size: .5625rem; bottom: 8px; }
 
-/* Results and deck builder */
+/* Results */
 .result-card { width: min(100%, 520px); padding: 30px 22px 22px; }
 .result-card > p:not(.eyebrow) { font-size: .875rem; line-height: 1.55; }
 .result-score small, .result-stats small, .battle-read small { font-size: .6875rem; }
 .result-stats b { font-size: 1rem; }
 .battle-read p { font-size: .8125rem; line-height: 1.55; }
-.deck-builder-modal { width: min(100%, 540px); padding: 24px 20px; }
-.deck-builder-modal h2 { font-size: 2.1rem; line-height: 1.05; }
-.deck-builder-modal > header > button { width: 48px; height: 48px; font-size: 1.25rem; }
-.deck-builder-copy { font-size: .875rem; line-height: 1.6; margin-block: 14px 20px; }
-.weapon-builder, .builder-selection { padding: 14px; margin-bottom: 13px; }
-.weapon-options { gap: 9px; margin-top: 12px; }
-.weapon-options button { min-height: 64px; font-size: .875rem; }
-.weapon-options button small { font-size: .75rem; }
-.builder-deck { gap: 6px; margin-top: 12px; }
-.card-library-wrap { margin: 20px 0; }
-.card-library { gap: 9px; margin-top: 12px; }
-.library-card { min-height: 132px; padding: 12px; }
-.library-card > b { margin-top: 10px; font-size: .875rem; }
-.library-card > small { color: #b5bdc9; font-size: .75rem; line-height: 1.5; margin-top: 6px; }
 .text-button { min-height: 48px; font-size: .75rem; }
 .toast { width: min(calc(100% - 30px),520px); padding: 15px; font-size: .75rem; line-height: 1.4; }
 
@@ -377,16 +349,13 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 
 .weapon-zone.counterable::after, .lane-zone.counterable::after { top: 3px; bottom: auto; min-width: 45px; padding: 2px 4px; font-size: .625rem; }
 
 /* Lane identity and lock feedback */
-.action-card, .library-card { border-top-width: 3px; }
-.category-attack { --category-color: #ff8b4f; }
-.category-crew { --category-color: #d9ff43; }
-.category-magic { --category-color: #c88cff; }
+.action-card { border-top-width: 3px; }
+.category-attack { --category-color: var(--siege-attack); }
+.category-crew { --category-color: var(--siege-crew); }
+.category-magic { --category-color: var(--siege-magic); }
 .action-card { border-top-color: var(--category-color,var(--line)); }
 .action-card.disabled, .weapon-card.disabled { opacity: .32; filter: grayscale(.65); cursor: not-allowed; }
 .action-card.disabled::after, .weapon-card.disabled::after { content: "LANE BUSY"; position: absolute; z-index: 4; inset: auto 4px 6px; padding: 3px; background: #090d14; color: #d8dde5; font: 700 .5625rem var(--mono); text-align: center; letter-spacing: .06em; }
-.library-card { border-top-color: var(--category-color,var(--line)); }
-.library-card > b { margin-top: 5px; }
-.library-card { min-height: 154px; }
 
 @media (max-height: 770px) {
   .arena { height: 360px; }
@@ -401,11 +370,11 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 
 @media (max-width: 340px) {
   .lobby-header { min-height: 136px; height: auto; flex-wrap: wrap; gap: 10px; padding-block: 14px; }
   .record-strip { grid-template-columns: repeat(2, 1fr); }
-  .loadout-deck, .builder-deck { grid-template-columns: repeat(3, 1fr); }
+  .loadout-deck { grid-template-columns: repeat(3, 1fr); }
   .phase-banner { grid-template-columns: 34px 1fr; }
   .phase-banner p { grid-column: 1 / -1; text-align: left; }
   .battle-header { grid-template-columns: 48px minmax(0,1fr) 68px; }
-  .hand-row, .battle-hand, .card-library { grid-template-columns: 1fr; }
+  .hand-row, .battle-hand { grid-template-columns: 1fr; }
   .action-card, .weapon-card { min-height: 88px; }
   .weapon-zone, .lane-zone { width: 56px; height: 60px; }
   .weapon-zone { left: 2%; }
@@ -529,103 +498,344 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 
   .compact-reserve { grid-template-columns: 92px minmax(0,1fr); }
 }
 
-/* Phase 5 owner: the Deck screen is a quartermaster's table with stable catalogue nodes. */
-.deck-screen { height: 100dvh; min-height: 0; overflow-y: auto; padding-bottom: calc(82px + env(safe-area-inset-bottom)); overscroll-behavior: contain; background: repeating-linear-gradient(90deg,transparent 0 31px,rgba(242,227,189,.025) 31px 32px),var(--siege-charred); color: var(--siege-parchment); scrollbar-width: thin; scrollbar-color: var(--siege-gold) var(--siege-shadow); }
-.deck-screen .deck-builder-modal { width: min(100%,720px); min-height: 100%; max-height: none; margin: 0 auto; padding: 0 14px 40px; overflow: visible; border: 0; background: transparent; box-shadow: none; }
-.deck-screen .deck-screen-header { position: sticky; top: 0; z-index: 8; min-height: 82px; margin: 0 -14px 16px; padding: max(12px,env(safe-area-inset-top)) 14px 10px; border: 0; border-bottom: 4px solid var(--siege-shadow); background: repeating-linear-gradient(0deg,var(--siege-oak) 0 12px,#59331f 12px 14px); box-shadow: 0 4px var(--siege-gold); }
+/* Phase 5 owner: a naturally scrolling quartermaster table with stable Deck and Armory roots. */
+.deck-screen {
+  --deck-gutter: 14px;
+  --deck-header-height: 94px;
+  --deck-nav-clearance: calc(76px + env(safe-area-inset-bottom));
+  --builder-card-height: 258px;
+  --card-action-height: 116px;
+  height: 100dvh;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-bottom: calc(92px + env(safe-area-inset-bottom));
+  overscroll-behavior: contain;
+  scroll-padding-block: calc(var(--deck-header-height) + 12px) calc(var(--deck-nav-clearance) + 88px);
+  background: repeating-linear-gradient(90deg,transparent 0 31px,rgba(242,227,189,.025) 31px 32px),var(--siege-charred);
+  color: var(--siege-parchment);
+  scrollbar-color: var(--siege-gold) var(--siege-shadow);
+  scrollbar-width: thin;
+}
+.deck-screen .deck-builder-modal { width: min(100%,720px); min-height: 100%; max-height: none; margin: 0 auto; padding: 0 var(--deck-gutter); overflow: visible; border: 0; background: transparent; box-shadow: none; }
+.deck-screen .deck-screen-header {
+  position: sticky;
+  z-index: 10;
+  top: 0;
+  min-height: var(--deck-header-height);
+  display: grid;
+  grid-template-columns: minmax(0,1fr) minmax(128px,260px);
+  gap: 10px;
+  align-items: center;
+  margin: 0 calc(var(--deck-gutter) * -1) 14px;
+  padding: max(10px,env(safe-area-inset-top)) var(--deck-gutter) 10px;
+  border: 0;
+  border-bottom: 4px solid var(--siege-shadow);
+  background: repeating-linear-gradient(0deg,var(--siege-oak) 0 12px,#59331f 12px 14px);
+  box-shadow: 0 4px var(--siege-gold);
+  transition: box-shadow var(--motion-state) var(--motion-ease-out),filter var(--motion-state) var(--motion-ease-out);
+}
+.deck-screen.is-scrolled .deck-screen-header { box-shadow: 0 4px var(--siege-gold),0 11px 0 rgba(12,10,8,.72); filter: brightness(.96); }
 .deck-screen .deck-screen-header .eyebrow { margin: 0 0 4px; color: var(--siege-gold); font: 900 .65rem var(--mono); letter-spacing: .09em; }
 .deck-screen .deck-screen-header .eyebrow span { background: var(--siege-gold); }
-.deck-screen .deck-screen-header h2 { margin: 0; color: var(--siege-parchment); font: 900 clamp(1.4rem,7vw,2rem)/1 var(--sans); text-shadow: 3px 3px var(--siege-shadow); }
-.deck-screen .deck-builder-copy { max-width: 620px; margin: 0 0 12px; color: var(--siege-parchment-aged); font-size: .9rem; line-height: 1.5; }
-.deck-status { min-height: 52px; display: flex; align-items: center; margin-bottom: 8px; padding: 9px 12px; border-left: 6px solid var(--siege-gold); font: 800 .75rem/1.4 var(--mono); }
-.deck-status[data-state="invalid"] { border-left-color: var(--siege-danger); background: #ead7b0; }
-.deck-status[data-state="dirty"] { border-left-color: var(--siege-attack); background: #ead7b0; }
-.deck-status[data-state="saving"] { border-left-color: var(--siege-magic); background: #ead7b0; }
-.deck-status[data-state="saved"] { border-left-color: var(--siege-positive); background: #ead7b0; }
-.deck-status[data-state="error"] { border-left-color: var(--siege-danger); background: #f1c6aa; }
-.restore-deck { min-height: 48px; margin: 0 0 12px; padding: 8px 12px; border: 2px solid var(--siege-shadow); background: var(--siege-parchment-aged); color: var(--siege-charred); box-shadow: 3px 3px var(--siege-shadow); font: 900 .72rem var(--mono); }
-.deck-screen .weapon-builder,
-.deck-screen .builder-selection,
-.deck-screen .deck-details { margin: 0 0 14px; padding: 12px; border: 2px solid var(--siege-shadow); border-radius: 0; outline-color: var(--siege-stone); background: var(--siege-parchment); color: var(--siege-charred); box-shadow: 4px 4px var(--siege-shadow); }
+.deck-screen .deck-screen-header h2 { margin: 0; color: var(--siege-parchment); font: 900 clamp(1.25rem,6vw,2rem)/1 var(--sans); text-shadow: 3px 3px var(--siege-shadow); }
+.deck-switcher { margin: 0 0 14px; padding: 9px; border: 3px solid var(--siege-shadow); background: var(--siege-parchment); color: var(--siege-charred); box-shadow: 4px 4px var(--siege-shadow); }
+.deck-switcher__heading { display: flex; justify-content: space-between; gap: 8px; margin-bottom: 7px; color: var(--siege-oak); font: 900 .7rem/1.2 var(--mono); }
+.deck-switcher__heading b { color: var(--siege-danger); }
+.deck-tabs { display: grid; grid-template-columns: repeat(5,minmax(0,1fr)); gap: 5px; }
+.deck-tabs button { min-width: 0; min-height: 54px; display: grid; place-items: center; align-content: center; gap: 3px; padding: 5px 2px; border: 2px solid var(--siege-stone); background: var(--siege-iron); color: var(--siege-parchment); box-shadow: 2px 2px var(--siege-shadow); cursor: pointer; }
+.deck-tabs b { font: 900 .62rem/1 var(--mono); white-space: nowrap; }
+.deck-tabs small { color: var(--siege-parchment-aged); font: 900 .5rem/1 var(--mono); }
+.deck-tabs button[aria-selected="true"] { border-color: var(--siege-gold); outline: 3px double var(--siege-danger); outline-offset: -6px; background: var(--siege-oak); }
+.deck-tabs button.is-active small { color: var(--siege-gold); }
+.deck-tabs button.has-draft { border-style: dashed; }
+.deck-tabs button.has-storage-error { border-color: var(--siege-danger); border-style: dashed; }
+.deck-screen .deck-status {
+  min-width: 0;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 28px minmax(0,1fr);
+  gap: 7px;
+  align-items: center;
+  margin: 0;
+  padding: 7px 8px;
+  border-left: 6px solid var(--siege-gold);
+  background: #ead7b0;
+  color: var(--siege-charred);
+  font: 800 .68rem/1.3 var(--mono);
+}
+.deck-status__emblem { width: 26px; height: 26px; display: grid; place-items: center; border: 2px solid var(--siege-shadow); background: var(--siege-gold); color: var(--siege-charred); font: 900 .9rem var(--mono); }
+.deck-status[data-state="invalid"] { border-left-color: var(--siege-danger); border-left-style: dashed; }
+.deck-status[data-state="saved"] { border-left-color: var(--siege-positive); }
+.deck-status[data-state="error"] { border-left-color: var(--siege-danger); border-style: dashed; background: #f1c6aa; }
+.deck-status[data-state="invalid"] .deck-status__emblem,
+.deck-status[data-state="error"] .deck-status__emblem { background: var(--siege-danger); color: var(--siege-parchment); }
+.deck-status[data-state="saved"] .deck-status__emblem { background: var(--siege-positive); }
+.deck-status.is-changing .deck-status__emblem { animation: deck-status-stamp var(--motion-state) steps(3); }
+
+.deck-screen .deck-hint { min-height: 58px; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 10px; align-items: center; margin: 0 0 14px; padding: 9px 10px; border-left: 6px solid var(--siege-shield); background: var(--siege-parchment-aged); color: var(--siege-charred); }
+.deck-hint p { margin: 0; font-size: .82rem; line-height: 1.4; }
+.deck-hint button { min-width: 58px; min-height: 48px; border: 2px solid var(--siege-shadow); background: var(--siege-oak); color: var(--siege-parchment); box-shadow: 3px 3px var(--siege-shadow); font: 900 .65rem var(--mono); }
+.deck-hint.is-dismissed { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; clip-path: inset(50%) !important; white-space: nowrap !important; }
+
+.deck-screen .deck-workbench { margin: 0 0 14px; padding: 11px; border: 2px solid var(--siege-shadow); border-radius: 0; outline-color: var(--siege-stone); background: var(--siege-parchment); color: var(--siege-charred); box-shadow: 4px 4px var(--siege-shadow); }
 .deck-screen .section-label { flex-wrap: wrap; gap: 6px 12px; color: var(--siege-charred); font-size: .75rem; }
 .deck-screen .section-label > span { min-width: 0; color: var(--siege-oak); }
 .deck-screen .section-label > b { margin-left: auto; color: var(--siege-danger); text-align: right; }
-.weapon-options { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px; }
-.weapon-option { min-width: 0; min-height: 116px; display: grid; grid-template-columns: minmax(0,1fr); gap: 6px; padding: 7px; border: 3px solid var(--siege-shadow); background: var(--siege-iron); color: var(--siege-parchment); box-shadow: 3px 3px var(--siege-shadow); text-align: left; cursor: pointer; }
-.weapon-option.selected { border-color: var(--siege-gold); outline: 3px double var(--siege-danger); outline-offset: -6px; }
-.weapon-option > small { color: var(--siege-parchment-aged); font-size: .75rem; line-height: 1.35; }
+
+.weapon-options { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; margin-top: 10px; }
+.weapon-option { min-width: 0; position: relative; padding: 5px; border: 3px solid var(--siege-shadow); background: var(--siege-iron); box-shadow: 3px 3px var(--siege-shadow); transition: transform var(--motion-hover) var(--motion-ease-out),box-shadow var(--motion-hover) var(--motion-ease-out); }
+.weapon-option.selected { border-color: var(--siege-gold); outline: 3px double var(--siege-danger); outline-offset: -7px; }
+.weapon-option.selected::after { content: "SELECTED"; position: absolute; z-index: 3; left: 7px; bottom: 7px; padding: 3px 5px; border: 1px solid var(--siege-shadow); background: var(--siege-danger); color: var(--siege-parchment); font: 900 .58rem var(--mono); }
+.weapon-option.is-confirmed { animation: deck-confirm var(--motion-spatial) steps(4); }
+.weapon-option__select { width: 100%; min-height: 232px; display: grid; grid-template-rows: 112px 74px auto; align-content: start; gap: 5px; padding: 6px 5px 8px; border: 0; background: transparent; color: var(--siege-parchment); text-align: left; cursor: pointer; transition: transform var(--motion-press) var(--motion-ease-out); }
+.weapon-option .card-info-button { position: absolute; z-index: 4; top: 7px; right: 7px; }
+.weapon-option__strengths { min-height: 74px; grid-row: 2; }
+.weapon-option__availability { display: block; min-height: 24px; padding: 5px 4px; border: 1px dashed var(--siege-parchment-aged); color: var(--siege-parchment-aged); font: 900 .58rem/1.2 var(--mono); text-align: center; }
 .weapon-option .card-frame { pointer-events: none; }
-.builder-deck { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 10px; }
-.deck-slot { min-width: 0; min-height: 142px; position: relative; padding: 24px 6px 6px; border: 2px solid var(--siege-shadow); background: var(--siege-iron); box-shadow: 3px 3px var(--siege-shadow); }
-.deck-slot.empty { border-style: dashed; background: color-mix(in srgb,var(--siege-iron) 80%,transparent); }
-.deck-slot-order { position: absolute; left: 5px; top: 4px; min-width: 22px; height: 18px; display: grid; place-items: center; border: 1px solid var(--siege-shadow); background: var(--siege-gold); color: var(--siege-charred); font: 900 .65rem var(--mono); }
-.deck-slot-card { width: 100%; min-height: 72px; display: block; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
-.deck-slot-card .card-frame { pointer-events: none; }
-.deck-slot-empty { min-height: 104px; display: grid; place-items: center; align-content: center; gap: 5px; color: var(--siege-parchment-aged); }
-.deck-slot-empty b { font-size: 1.5rem; }
-.deck-slot-empty small { font: 900 .65rem var(--mono); }
-.deck-slot-actions { display: grid; grid-template-columns: repeat(3,minmax(48px,1fr)); gap: 5px; margin-top: 7px; }
-.deck-slot-actions button { min-width: 48px; min-height: 48px; border: 2px solid var(--siege-shadow); background: var(--siege-parchment-aged); color: var(--siege-charred); font: 900 1rem var(--mono); cursor: pointer; }
-.deck-slot-actions button[data-slot-action="remove"] { background: var(--siege-danger); color: var(--siege-parchment); }
-.deck-slot-actions button:disabled { opacity: .42; cursor: not-allowed; }
-.card-frame--deck { width: 100%; min-height: 72px; grid-template-columns: 48px minmax(0,1fr) 30px; gap: 7px; box-shadow: 2px 2px var(--siege-shadow); }
-.card-frame--deck .card-frame__body strong { font-size: .78rem; line-height: 1.15; white-space: normal; }
-.card-frame--deck .card-frame__category { flex-wrap: wrap; font-size: .75rem; line-height: 1.15; }
-.card-frame--deck .card-frame__category i::before { content: "/"; margin-right: 5px; }
-.card-frame--deck .card-frame__cost { margin-right: 2px; }
-.deck-details { display: grid; grid-template-columns: 1fr; gap: 10px; }
-.deck-detail-frame { min-width: 0; }
-.card-frame--detail { min-height: 96px; grid-template-columns: 48px minmax(0,1fr) 34px; padding: 8px; }
-.card-frame--detail .card-frame__body strong { font-size: .95rem; line-height: 1.15; white-space: normal; }
-.deck-detail-copy { min-width: 0; }
-.deck-detail-copy > small { color: var(--siege-oak); font: 900 .75rem var(--mono); }
-.deck-detail-copy h3 { margin: 4px 0 6px; color: var(--siege-charred); font-size: 1.1rem; }
-.deck-detail-copy p { margin: 0; color: #4d3a2b; font-size: .88rem; line-height: 1.45; }
-.deck-detail-stats { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 9px; }
-.deck-detail-stats b { padding: 5px 7px; border: 2px solid var(--siege-oak); background: var(--siege-parchment-aged); font: 900 .75rem var(--mono); }
-.deck-detail-toggle { min-height: 48px; padding: 8px; border: 2px solid var(--siege-shadow); background: var(--siege-gold); color: var(--siege-charred); box-shadow: 3px 3px var(--siege-shadow); font: 900 .72rem var(--mono); }
-.deck-detail-toggle[aria-pressed="true"] { background: var(--siege-danger); color: var(--siege-parchment); }
-.deck-detail-toggle:disabled { background: var(--siege-stone); opacity: .72; }
-.deck-screen .save-loadout { position: static; min-height: 70px; margin: 2px 0 20px; border: 3px solid var(--siege-shadow); border-radius: 0; background: var(--siege-gold); color: var(--siege-charred); box-shadow: 4px 4px var(--siege-shadow); }
-.deck-screen .save-loadout[data-state="saved"] { background: var(--siege-positive); }
-.deck-screen .save-loadout[data-state="saving"] { background: var(--siege-magic); color: var(--siege-shadow); }
-.deck-screen .save-loadout small { color: var(--siege-shadow); }
-.deck-screen .save-loadout:disabled { border-style: dashed; filter: none; opacity: 1; cursor: not-allowed; }
-.deck-screen .card-library-wrap { margin: 0; padding-top: 4px; }
-.deck-filters { display: flex; flex-wrap: wrap; gap: 7px; margin: 10px 0 12px; }
-.deck-filters button { flex: 1 1 92px; min-height: 48px; padding: 6px; border: 2px solid var(--siege-stone); background: var(--siege-iron); color: var(--siege-parchment); font: 900 .7rem var(--mono); }
+.deck-screen .weapon-option .card-frame--armory { min-height: 112px; grid-template-columns: 1fr; grid-template-rows: 62px auto; gap: 5px; padding: 5px 9px 5px 4px; border: 0; border-left: 5px solid var(--category-color); background: var(--siege-parchment); box-shadow: 2px 2px var(--siege-shadow); clip-path: none; }
+.deck-screen .weapon-option .card-frame--armory .card-frame__art { grid-column: 1; grid-row: 1; width: 48px; height: 48px; align-self: center; justify-self: center; transform: none; }
+.deck-screen .weapon-option .card-frame--armory .card-frame__body { grid-column: 1; grid-row: 2; padding-right: 0; text-align: center; }
+.deck-screen .weapon-option .card-frame--armory .card-frame__body strong { min-height: 2.2em; font-size: .78rem; white-space: normal; }
+.deck-screen .weapon-option .card-frame--armory .card-frame__category { justify-content: center; font-size: .62rem; }
+.deck-screen .weapon-option .card-frame--armory .card-frame__cost { left: 2px; right: auto; top: 2px; }
+
+.builder-deck { display: grid; gap: 10px; margin-top: 10px; }
+.deck-cycle-row { min-width: 0; }
+.deck-cycle-row__label { display: flex; justify-content: space-between; gap: 8px; margin: 0 0 6px; padding: 5px 7px; border-left: 5px solid var(--siege-gold); background: var(--siege-iron); color: var(--siege-parchment); font: 900 .72rem/1.25 var(--mono); letter-spacing: .04em; }
+.deck-cycle-row__label span { color: var(--siege-parchment-aged); font-size: .6rem; }
+.deck-cycle-cards { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 6px; }
+.deck-slot { min-width: 0; height: var(--builder-card-height); min-height: var(--builder-card-height); position: relative; z-index: 0; border: 0; background: transparent; isolation: isolate; transition: transform var(--motion-spatial) var(--motion-ease-out),opacity var(--motion-state) linear; }
+.deck-slot.empty { border: 3px dashed var(--siege-shadow); background: color-mix(in srgb,var(--siege-iron) 80%,transparent); box-shadow: 3px 3px var(--siege-shadow); }
+.deck-slot.is-active,
+.deck-slot.is-expanded { z-index: 7; transform: translateY(-3px); }
+.deck-slot.is-dragging { border-style: dashed; opacity: .38; }
+.deck-slot.is-drop-target { outline: 4px double var(--siege-gold); outline-offset: 2px; }
+.deck-slot.is-confirmed { animation: deck-confirm var(--motion-spatial) steps(4); }
+.deck-slot-order { position: absolute; z-index: 5; right: 4px; top: 4px; min-width: 30px; height: 24px; display: grid; place-items: center; border: 2px solid var(--siege-shadow); background: var(--siege-gold); color: var(--siege-charred); font: 900 .72rem var(--mono); }
+.deck-slot.is-active .deck-slot-order { animation: deck-badge-pop var(--motion-state) steps(3); }
+.deck-slot__select { touch-action: pan-y pinch-zoom; -webkit-touch-callout: none; user-select: none; cursor: grab; transition: transform var(--motion-spatial) var(--motion-ease-out),filter var(--motion-hover) var(--motion-ease-out); }
+.deck-slot__select[aria-grabbed="true"] { cursor: grabbing; }
+.deck-slot__frame,
+.deck-slot__frame > .card-frame { width: 100%; }
+.deck-slot__frame .card-frame { pointer-events: none; }
+.replacement-slot .card-frame--deck,
+.deck-travel-clone .card-frame--deck,
+.deck-drag-avatar .card-frame--deck { width: 100%; min-height: 80px; display: grid; grid-template-columns: 1fr; grid-template-rows: 48px auto; place-content: start center; gap: 3px; padding: 3px; border-left-width: 5px; box-shadow: 2px 2px var(--siege-shadow); text-align: center; }
+.replacement-slot .card-frame--deck .card-frame__art,
+.deck-travel-clone .card-frame--deck .card-frame__art,
+.deck-drag-avatar .card-frame--deck .card-frame__art { grid-row: 1; justify-self: center; }
+.replacement-slot .card-frame--deck .card-frame__body,
+.deck-travel-clone .card-frame--deck .card-frame__body,
+.deck-drag-avatar .card-frame--deck .card-frame__body { grid-row: 2; min-width: 0; }
+.replacement-slot .card-frame--deck .card-frame__body strong,
+.deck-travel-clone .card-frame--deck .card-frame__body strong,
+.deck-drag-avatar .card-frame--deck .card-frame__body strong { min-height: 2.15em; font-size: .74rem; line-height: 1.05; white-space: normal; }
+.replacement-slot .card-frame--deck .card-frame__category,
+.deck-travel-clone .card-frame--deck .card-frame__category,
+.deck-drag-avatar .card-frame--deck .card-frame__category { display: none; }
+.replacement-slot .card-frame--deck .card-frame__cost,
+.deck-travel-clone .card-frame--deck .card-frame__cost,
+.deck-drag-avatar .card-frame--deck .card-frame__cost { position: absolute; left: 2px; right: auto; top: 2px; width: 27px; height: 27px; margin: 0; font-size: .72rem; }
+.deck-slot__empty { min-width: 48px; min-height: 48px; border: 2px solid var(--siege-shadow); box-shadow: 2px 2px var(--siege-shadow); font: 900 .6rem var(--mono); cursor: pointer; }
+.deck-slot__empty { position: absolute; inset: 4px; display: grid; place-items: center; align-content: center; gap: 3px; border-style: dashed; background: var(--siege-iron); color: var(--siege-parchment-aged); }
+.deck-slot__empty b { font-size: 1.55rem; }
+.deck-slot__empty:disabled { opacity: .66; cursor: not-allowed; }
+.deck-slot.is-located { z-index: 5; outline: 5px double var(--siege-gold); outline-offset: 3px; animation: deck-located 500ms steps(2); }
+.deck-insertion-marker { position: absolute; z-index: 8; top: 50%; left: -14px; width: 28px; height: 36px; display: none; place-items: center; border: 3px solid var(--siege-shadow); background: var(--siege-gold); color: var(--siege-charred); box-shadow: 3px 3px var(--siege-shadow); font: 900 .82rem var(--mono); transform: translateY(-50%); }
+.deck-slot.is-drop-target .deck-insertion-marker { display: grid; }
+.builder-deck.is-restored .deck-slot { animation: deck-restore var(--motion-spatial) steps(4); }
+
+.deck-summary { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 5px; margin-top: 10px; }
+.deck-summary > * { min-width: 0; min-height: 48px; display: grid; place-items: center; align-content: center; padding: 5px 3px; border: 2px solid var(--siege-shadow); background: var(--siege-parchment-aged); color: var(--siege-charred); text-align: center; }
+.deck-summary > *.is-updated { animation: deck-summary-update var(--motion-state) steps(3); }
+.deck-summary small { color: var(--siege-oak); font: 900 .55rem/1.15 var(--mono); }
+.deck-summary strong { margin-top: 3px; font: 900 .85rem/1 var(--mono); }
+.deck-summary__cost,
+.deck-summary__readiness { grid-column: span 3; }
+.deck-summary__category { grid-column: span 2; border-top: 5px solid var(--category-color); }
+.deck-summary__readiness { background: var(--siege-positive); }
+
+.deck-history { margin: 0 0 18px; padding: 7px; border: 3px solid var(--siege-shadow); background: var(--siege-parchment); box-shadow: 4px 4px var(--siege-shadow); }
+.deck-undo { min-height: 52px; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: center; padding: 4px 4px 4px 9px; border: 2px dashed var(--siege-oak); background: var(--siege-parchment-aged); color: var(--siege-charred); font: 800 .72rem/1.3 var(--mono); animation: deck-undo-in var(--motion-state) var(--motion-ease-out); }
+.deck-undo button { min-width: 64px; min-height: 48px; border: 2px solid var(--siege-shadow); background: var(--siege-oak); color: var(--siege-parchment); box-shadow: 2px 2px var(--siege-shadow); font: 900 .7rem var(--mono); }
+
+.deck-screen .card-library-wrap { margin: 0; padding: 4px 0 calc(var(--card-action-height) + 28px); }
+.armory-heading { margin-bottom: 8px; padding: 7px 8px; border-left: 6px solid var(--siege-gold); background: var(--siege-parchment); }
+.deck-screen .armory-toolbar { position: sticky; z-index: 8; top: var(--deck-header-height); display: grid; grid-template-columns: minmax(0,1fr) minmax(126px,.7fr); gap: 7px; margin: 0 0 14px; padding: 8px; border: 3px solid var(--siege-shadow); background: color-mix(in srgb,var(--siege-parchment) 96%,transparent); color: var(--siege-charred); box-shadow: 4px 4px var(--siege-shadow); transition: background-color var(--motion-state) linear,box-shadow var(--motion-state) var(--motion-ease-out); }
+.deck-screen.is-browsing-armory .armory-toolbar { background: var(--siege-parchment); box-shadow: 0 5px var(--siege-gold),5px 5px var(--siege-shadow); }
+.armory-search { min-width: 0; grid-column: 1 / -1; }
+.armory-search label,
+.armory-sort > span { display: block; margin-bottom: 4px; color: var(--siege-oak); font: 900 .65rem var(--mono); }
+.armory-search > div { min-width: 0; display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 6px; }
+.armory-search input,
+.armory-sort select { width: 100%; min-width: 0; min-height: 48px; border: 2px solid var(--siege-shadow); border-radius: 0; background: var(--siege-parchment-aged); color: var(--siege-charred); font: 800 .78rem var(--sans); color-scheme: light; }
+.armory-search input { padding: 8px 10px; }
+.armory-search input::placeholder { color: #655140; opacity: 1; }
+.armory-search button { min-width: 58px; min-height: 48px; border: 2px solid var(--siege-shadow); background: var(--siege-oak); color: var(--siege-parchment); box-shadow: 2px 2px var(--siege-shadow); font: 900 .62rem var(--mono); }
+.deck-filters { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 5px; margin: 0; }
+.deck-filters button { min-width: 0; min-height: 48px; padding: 5px 2px; border: 2px solid var(--siege-stone); background: var(--siege-iron); color: var(--siege-parchment); font: 900 .64rem var(--mono); cursor: pointer; transition: transform var(--motion-press) var(--motion-ease-out),box-shadow var(--motion-state) var(--motion-ease-out),background-color var(--motion-state) linear; }
 .deck-filters button[aria-pressed="true"] { border-color: var(--siege-gold); background: var(--siege-oak); box-shadow: inset 0 -5px var(--siege-gold); }
-.card-library { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 0; }
-.deck-screen .library-card { min-width: 0; min-height: 132px; display: grid; grid-template-columns: minmax(0,1fr); gap: 6px; padding: 7px; border: 3px solid var(--siege-shadow); border-left: 7px solid var(--category-color); background: var(--siege-iron); box-shadow: 3px 3px var(--siege-shadow); }
-.deck-screen .library-card.selected { border-color: var(--siege-gold); border-left-color: var(--category-color); box-shadow: 3px 3px var(--siege-shadow),inset 0 0 0 3px var(--siege-danger); }
+.armory-sort { min-width: 0; }
+.armory-sort select { padding: 7px 30px 7px 7px; font: 900 .62rem var(--mono); }
+.reset-deck-filters { align-self: end; min-height: 48px; border: 2px solid var(--siege-shadow); background: var(--siege-iron); color: var(--siege-parchment); box-shadow: 2px 2px var(--siege-shadow); font: 900 .62rem var(--mono); }
+.deck-screen .armory-no-results { min-height: 150px; display: grid; place-items: center; align-content: center; gap: 14px; margin: 14px 0; padding: 18px; border-style: dashed; background: var(--siege-parchment); color: var(--siege-charred); text-align: center; animation: deck-fade-in var(--motion-state) linear; }
+.armory-no-results strong { font: 900 .82rem var(--mono); }
+.armory-no-results button { min-width: 150px; min-height: 48px; border: 2px solid var(--siege-shadow); background: var(--siege-gold); color: var(--siege-charred); box-shadow: 3px 3px var(--siege-shadow); font: 900 .7rem var(--mono); }
+.card-library { display: block; margin-top: 0; }
+.armory-group { min-width: 0; margin: 0 0 20px; }
+.armory-group__heading { display: grid; grid-template-columns: auto minmax(30px,1fr); gap: 9px; align-items: center; margin: 0 0 9px; color: var(--siege-parchment); font: 900 .82rem var(--mono); letter-spacing: .07em; }
+.armory-group__heading::after { content: ""; height: 4px; grid-column: 2; grid-row: 1; background: linear-gradient(90deg,var(--category-color),transparent); transform-origin: left; animation: deck-divider-in var(--motion-dialog) var(--motion-ease-out); }
+.armory-group__heading span { color: var(--siege-parchment-aged); }
+.armory-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+.deck-screen .library-card { min-width: 0; height: var(--builder-card-height); min-height: var(--builder-card-height); position: relative; z-index: 0; transition: transform var(--motion-hover) var(--motion-ease-out),filter var(--motion-state) linear; }
+.deck-screen .library-card.is-expanded { z-index: 7; transform: translateY(-3px); }
+.library-card__select,
+.deck-slot__select { width: 100%; height: var(--builder-card-height); min-height: var(--builder-card-height); display: grid; grid-template-rows: 166px minmax(62px,1fr); align-content: stretch; gap: 6px; padding: 6px; border: 3px solid var(--siege-shadow); border-top: 7px solid var(--category-color); border-radius: 0; background: var(--siege-iron); color: var(--siege-parchment); box-shadow: 4px 4px var(--siege-shadow); text-align: left; cursor: pointer; transition: transform var(--motion-press) var(--motion-ease-out),box-shadow var(--motion-hover) var(--motion-ease-out),filter var(--motion-hover) linear; }
+.deck-slot__select { cursor: grab; }
+.deck-slot__select[aria-grabbed="true"] { cursor: grabbing; }
+.library-card.is-expanded .library-card__select,
+.deck-slot.is-expanded .deck-slot__select { outline: 4px double var(--siege-gold); outline-offset: 2px; box-shadow: 6px 6px var(--siege-shadow); }
+.library-card.is-replacement-candidate .library-card__select { outline: 5px double var(--siege-danger); outline-offset: 3px; box-shadow: 5px 5px var(--siege-shadow),inset 0 0 0 4px var(--siege-gold); }
+.deck-screen .card-frame--armory { min-height: 166px; display: grid; grid-template-columns: 1fr; grid-template-rows: 96px auto; gap: 7px; align-items: start; padding: 8px 4px 6px; border: 0; border-left: 6px solid var(--category-color); background: var(--siege-parchment); box-shadow: 2px 2px var(--siege-shadow); overflow: hidden; }
+.deck-screen .card-frame--armory .card-frame__art { width: 48px; height: 48px; grid-row: 1; align-self: center; justify-self: center; transform: scale(2); transform-origin: center; }
+.deck-screen .card-frame--armory .card-frame__body { grid-row: 2; min-width: 0; padding: 0 3px; text-align: center; }
+.deck-screen .card-frame--armory .card-frame__category { justify-content: center; flex-wrap: wrap; gap: 4px; color: var(--siege-iron); font-size: .75rem; line-height: 1.15; }
+.deck-screen .card-frame--armory .card-frame__category i::before { content: "/"; margin-right: 4px; }
+.deck-screen .card-frame--armory .card-frame__body strong { min-height: 2.2em; margin-top: 4px; font-size: .875rem; line-height: 1.1; text-align: center; white-space: normal; }
+.deck-screen .card-frame--armory .card-frame__cost { position: absolute; z-index: 2; left: 4px; right: auto; top: 4px; width: 34px; height: 34px; margin: 0; font-size: .82rem; }
+.deck-screen .library-card .card-frame__seal,
+.deck-screen .deck-slot .card-frame__seal { display: none; }
+.deck-screen .library-card.is-in-deck .card-frame__seal { display: grid; }
+.library-card__strengths { min-height: 62px; grid-row: 2; display: grid; grid-auto-rows: 1fr; gap: 4px; align-content: stretch; }
+.library-card__strengths b { min-height: 25px; display: grid; place-items: center; padding: 5px 3px; border: 1px solid var(--siege-shadow); background: var(--siege-parchment-aged); color: var(--siege-charred); font: 900 .75rem/1.15 var(--mono); text-align: center; }
+.card-action-popover { position: absolute; z-index: 12; top: calc(100% + 4px); left: 0; right: 0; min-height: var(--card-action-height); display: grid; gap: 6px; padding: 7px; border: 3px solid var(--siege-shadow); outline: 3px double var(--siege-gold); outline-offset: -7px; background: var(--siege-iron); box-shadow: 6px 6px var(--siege-shadow); }
+.card-action-popover button { width: 100%; min-width: 0; min-height: 48px; border: 2px solid var(--siege-shadow); color: var(--siege-charred); box-shadow: 2px 2px var(--siege-shadow); font: 900 .68rem/1.1 var(--mono); cursor: pointer; }
+.card-action-popover__info { background: var(--siege-gold); }
+.card-action-popover__primary { background: var(--siege-oak); color: var(--siege-parchment) !important; }
+.library-card.is-in-deck .card-action-popover__primary,
+.card-action-popover__remove { background: var(--siege-danger); color: var(--siege-parchment) !important; }
+.card-info-button { min-width: 48px; min-height: 48px; display: grid; place-items: center; padding: 4px; border: 2px solid var(--siege-shadow); background: var(--siege-gold); color: var(--siege-charred); box-shadow: 2px 2px var(--siege-shadow); font: 900 .58rem/1 var(--mono); cursor: pointer; transition: transform var(--motion-press) var(--motion-ease-out); }
 .deck-screen [hidden] { display: none !important; }
-.library-card__details { min-width: 0; display: block; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
-.library-card__details .card-frame { pointer-events: none; }
-.library-card__details[aria-current="true"] { outline: 3px solid var(--siege-shield); outline-offset: 2px; }
-.library-card__toggle { min-height: 48px; padding: 7px; border: 2px solid var(--siege-shadow); background: var(--siege-gold); color: var(--siege-charred); font: 900 .75rem var(--mono); }
-.library-card__toggle[aria-pressed="true"] { background: var(--siege-danger); color: var(--siege-parchment); }
-.library-card__toggle:disabled { background: var(--siege-stone); color: var(--siege-parchment); opacity: .75; }
 
-@media (min-width: 420px) {
-  .weapon-options { grid-template-columns: repeat(2,minmax(0,1fr)); }
+.deck-travel-clone,
+.deck-drag-avatar { position: fixed; z-index: 2000; min-width: 88px; pointer-events: none; border: 3px solid var(--siege-gold); background: var(--siege-iron); box-shadow: 7px 7px var(--siege-shadow); }
+.deck-travel-clone { overflow: hidden; }
+.deck-travel-clone.is-removing { border-style: dashed; }
+.deck-drag-avatar { width: 118px; min-height: 112px; opacity: .94; }
+.armory-filter-clone { position: fixed !important; z-index: 6; margin: 0 !important; pointer-events: none; overflow: hidden; }
+
+.deck-overlay { z-index: 4000; align-items: end; overflow-y: auto; padding: max(8px,env(safe-area-inset-top)) 8px max(8px,env(safe-area-inset-bottom)); background: rgba(12,10,8,.9); backdrop-filter: none; animation: deck-overlay-in 160ms linear; }
+.deck-overlay .deck-info-sheet,
+.deck-overlay .deck-replacement-sheet { position: relative; width: min(100%,620px); max-height: calc(100dvh - max(16px,env(safe-area-inset-top)) - max(16px,env(safe-area-inset-bottom))); overflow-y: auto; padding: 20px 14px max(18px,env(safe-area-inset-bottom)); border: 4px solid var(--siege-shadow); outline: 3px double var(--siege-gold); outline-offset: -8px; background: var(--siege-parchment); color: var(--siege-charred); box-shadow: 7px 7px var(--siege-shadow); animation: deck-sheet-in var(--motion-dialog) var(--motion-ease-out); }
+.deck-sheet-close { position: absolute; z-index: 3; top: 10px; right: 10px; width: 48px; height: 48px; border: 3px solid var(--siege-shadow); background: var(--siege-danger); color: var(--siege-parchment); box-shadow: 3px 3px var(--siege-shadow); font: 900 1.4rem var(--mono); }
+.deck-info-portrait { width: 112px; height: 112px; display: grid; place-items: center; margin: 4px auto 14px; border: 4px solid var(--siege-shadow); background: var(--siege-iron); box-shadow: 4px 4px var(--siege-shadow); overflow: hidden; }
+.deck-info-portrait .pixel-sprite { transform: scale(2); transform-origin: center; }
+.deck-info-copy { min-width: 0; }
+.deck-info-copy .eyebrow,
+.deck-replacement-sheet .eyebrow { margin: 0 58px 7px 0; color: var(--siege-oak); font: 900 .72rem var(--mono); }
+.deck-info-copy .eyebrow span,
+.deck-replacement-sheet .eyebrow span { background: var(--siege-gold); }
+.deck-info-copy h2,
+.deck-replacement-sheet h2 { margin: 0; color: var(--siege-charred); font-size: clamp(1.65rem,8vw,2.5rem); line-height: 1; text-shadow: 2px 2px var(--siege-parchment-aged); }
+#deck-info-meta { margin: 9px 0; color: var(--siege-oak); font: 900 .75rem var(--mono); }
+.deck-info-cost { display: inline-grid; min-height: 40px; place-items: center; padding: 6px 10px; border: 2px solid var(--siege-shadow); background: var(--siege-gold); font: 900 .82rem var(--mono); }
+#deck-info-description,
+#deck-replace-copy { color: #4d3a2b; font-size: .95rem; line-height: 1.5; }
+.deck-info-stats { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.deck-info-stats b { padding: 6px 8px; border: 2px solid var(--siege-oak); background: var(--siege-parchment-aged); color: var(--siege-charred); font: 900 .75rem var(--mono); }
+#deck-info-membership { margin: 12px 0 0; padding: 8px; border-left: 6px solid var(--siege-gold); background: var(--siege-parchment-aged); color: var(--siege-charred); font-weight: 800; }
+.deck-replacement-sheet > .secondary-cta { min-height: 52px; margin-top: 12px; border: 3px solid var(--siege-shadow); background: var(--siege-iron); color: var(--siege-parchment); box-shadow: 3px 3px var(--siege-shadow); text-align: center; }
+.deck-replacement-options { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; margin-top: 14px; }
+.deck-replacement-options article { min-width: 0; }
+.replacement-slot { width: 100%; min-height: 132px; display: grid; gap: 5px; padding: 5px; border: 3px solid var(--siege-shadow); background: var(--siege-iron); color: var(--siege-parchment); box-shadow: 3px 3px var(--siege-shadow); cursor: pointer; }
+.replacement-slot__position { display: block; color: var(--siege-gold); font: 900 .6rem var(--mono); text-align: center; }
+.replacement-slot__empty { min-height: 80px; display: grid; place-items: center; border: 2px dashed var(--siege-gold); color: var(--siege-parchment-aged); font: 900 .62rem var(--mono); }
+
+.deck-screen.is-entering .deck-screen-header { animation: deck-header-in var(--motion-dialog) var(--motion-ease-out); }
+.deck-screen.is-entering .deck-workbench { animation: deck-fade-rise var(--motion-dialog) var(--motion-ease-out) both; }
+.deck-screen.is-entering .builder-selection { animation-delay: 30ms; }
+.deck-screen.is-entering .deck-history { animation: deck-fade-rise var(--motion-dialog) var(--motion-ease-out) 60ms both; }
+.deck-screen.is-entering .card-library-wrap { animation: deck-fade-in var(--motion-dialog) linear 90ms both; }
+.deck-screen.is-returning .deck-builder-modal { animation: deck-fade-in var(--motion-state) linear; }
+
+@keyframes deck-header-in { from { transform: translateY(-8px); opacity: .55; } }
+@keyframes deck-located { 0%,100% { outline-color: var(--siege-gold); } 50% { outline-color: var(--siege-danger); } }
+@keyframes deck-fade-rise { from { transform: translateY(7px); opacity: 0; } }
+@keyframes deck-fade-in { from { opacity: 0; } }
+@keyframes deck-overlay-in { from { opacity: 0; } }
+@keyframes deck-sheet-in { from { transform: translateY(18px); opacity: .35; } }
+@keyframes deck-undo-in { from { transform: translateY(6px); opacity: 0; } }
+@keyframes deck-divider-in { from { transform: scaleX(0); } }
+@keyframes deck-status-stamp { 50% { transform: translateY(2px); box-shadow: inset 0 0 0 2px var(--siege-shadow); } }
+@keyframes deck-badge-pop { 50% { transform: translateY(-3px); } }
+@keyframes deck-confirm { 50% { transform: translateY(-4px); box-shadow: 6px 6px var(--siege-shadow); } }
+@keyframes deck-restore { 50% { transform: translateY(-3px); } }
+@keyframes deck-summary-update { 50% { box-shadow: inset 0 0 0 4px var(--siege-gold); } }
+
+@media (hover: hover) and (pointer: fine) {
+  .weapon-option:hover,
+  .deck-screen .library-card:not(.is-expanded):hover { transform: translateY(-4px); }
+  .weapon-option:hover,
+  .deck-screen .library-card:hover .library-card__select { box-shadow: 6px 6px var(--siege-shadow); }
+  .deck-slot__select:hover { filter: brightness(1.08); }
+  .card-info-button:hover,
+  .card-action-popover button:hover { transform: translateY(-2px); box-shadow: 4px 4px var(--siege-shadow); }
+  .deck-filters button:hover,
+  .reset-deck-filters:hover { background: var(--siege-oak); }
 }
+.weapon-option__select:active,
+.library-card__select:active,
+.deck-slot__select:active,
+.replacement-slot:active { transform: translate(2px,2px); }
+
 @media (min-width: 480px) {
-  .builder-deck { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .armory-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .deck-summary { grid-template-columns: repeat(5,minmax(0,1fr)); }
+  .deck-summary__cost,
+  .deck-summary__category,
+  .deck-summary__readiness { grid-column: span 1; }
 }
-
 @media (min-width: 600px) {
   .lobby { height: calc(100dvh - 28px); }
-  .deck-screen { height: calc(100dvh - 28px); }
-  .deck-screen .deck-builder-modal { padding-inline: 22px; }
-  .deck-screen .deck-screen-header { margin-inline: -22px; padding-inline: 22px; }
-  .deck-details { grid-template-columns: minmax(0,210px) minmax(0,1fr); }
-  .deck-detail-toggle { grid-column: 1 / -1; }
-  .card-library { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .deck-screen { --deck-gutter: 22px; height: calc(100dvh - 28px); }
   .battle-home { min-height: 525px; padding-top: 32px; }
   .league-badge { width: 122px; height: 132px; }
+  .deck-overlay { align-items: center; }
+  .deck-overlay .deck-info-sheet { display: grid; grid-template-columns: 132px minmax(0,1fr); gap: 18px; padding: 24px 22px; }
+  .deck-info-portrait { margin: 14px 0 0; }
+  .deck-info-copy { grid-column: 2; }
 }
-@media (min-width: 680px) {
-  .builder-deck { grid-template-columns: repeat(3,minmax(0,1fr)); }
+@media (min-width: 800px) {
+  .armory-grid { grid-template-columns: repeat(4,minmax(0,1fr)); }
+}
+@media (min-resolution: 1.75dppx) and (max-width: 799px) {
+  .armory-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 320px) {
+  .deck-screen { --deck-gutter: 8px; }
+  .deck-screen .deck-screen-header { grid-template-columns: minmax(0,1fr) minmax(118px,.9fr); gap: 6px; }
+  .deck-status { padding-inline: 5px; font-size: .62rem; }
+  .deck-screen .deck-hint { grid-template-columns: 1fr; }
+  .deck-hint button { width: 100%; }
+  .deck-screen .deck-workbench { padding-inline: 8px; }
+  .deck-cycle-cards { gap: 4px; }
+  .armory-grid { gap: 8px; }
+  .library-card__select,
+  .deck-slot__select { padding-inline: 4px; }
+}
+@media (max-width: 279px) {
+  .deck-screen { --deck-header-height: 150px; }
+  .deck-screen .deck-screen-header { position: relative; grid-template-columns: 1fr; }
+  .weapon-options,
+  .deck-cycle-cards,
+  .armory-grid,
+  .deck-replacement-options { grid-template-columns: 1fr; }
+  .deck-tabs { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  .deck-filters { grid-template-columns: repeat(2,minmax(0,1fr)); }
+}
+@media (max-height: 680px) {
+  .deck-screen .armory-toolbar { position: static; }
 }
 @media (max-width: 520px) {
   .lobby .match-buttons { grid-template-columns: 1fr; }
@@ -763,7 +973,6 @@ button:focus-visible, a:focus-visible, [role="button"]:focus-visible { outline: 
 .card-frame.is-selected .card-frame__seal { display: grid; }
 .card-frame.is-busy { border-style: dashed; filter: grayscale(.35); }
 .card-frame.is-pending { outline: 2px double var(--siege-gold); }
-.card-frame.is-selected::after { content: "SELECTED"; position: absolute; inset: auto 26px 2px auto; font: 800 .55rem var(--mono); }
 .card-frame--lobby { height: 62px; display: block; border-left-width: 4px; box-shadow: 2px 2px 0 var(--siege-shadow); }
 .card-frame--lobby .card-frame__art { margin: 5px auto 0; }
 .card-frame--lobby .card-frame__body { display: none; }
@@ -837,15 +1046,23 @@ body.menu-active { background: var(--siege-shadow); }
 .lobby .loadout-weapon span,
 .lobby .loadout-weapon small { color: #594532; font-size: .62rem; }
 .lobby .loadout-weapon b { color: var(--siege-danger); font-size: .75rem; }
-.lobby-tabs { position: absolute; z-index: 6; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(3,1fr); padding: 6px 8px max(6px,env(safe-area-inset-bottom)); border-top: 4px solid var(--siege-shadow); background: repeating-linear-gradient(0deg,var(--siege-oak) 0 12px,#57321f 12px 14px); box-shadow: 0 -4px var(--siege-gold); }
-.lobby-tab { min-width: 0; min-height: 58px; display: grid; place-items: center; align-content: center; gap: 5px; border: 0; border-right: 2px solid #3c2418; background: transparent; color: var(--siege-parchment-aged); cursor: pointer; }
+.lobby-tabs { position: absolute; z-index: 20; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(3,1fr); padding: 6px 8px max(6px,env(safe-area-inset-bottom)); border-top: 4px solid var(--siege-shadow); background: repeating-linear-gradient(0deg,var(--siege-oak) 0 12px,#57321f 12px 14px); box-shadow: 0 -4px var(--siege-gold); }
+.lobby-tabs__marker { position: absolute; z-index: 0; left: 8px; bottom: max(6px,env(safe-area-inset-bottom)); width: calc((100% - 16px) / 3); height: 4px; background: var(--siege-gold); box-shadow: 0 -2px var(--siege-shadow); pointer-events: none; transition: transform var(--motion-state) var(--motion-ease-out); }
+.lobby-tabs:has(#open-deck.active) .lobby-tabs__marker { transform: translateX(100%); }
+.lobby-tab { min-width: 0; min-height: 58px; position: relative; z-index: 1; display: grid; place-items: center; align-content: center; gap: 5px; border: 0; border-right: 2px solid #3c2418; background: transparent; color: var(--siege-parchment-aged); cursor: pointer; }
 .lobby-tab:last-child { border-right: 0; }
 .lobby-tab b { font: 900 .66rem var(--mono); letter-spacing: .08em; }
 .lobby-tab.active,
-.lobby-tab:hover,
 .lobby-tab:focus-visible { color: var(--siege-parchment); background: rgba(211,165,59,.16); box-shadow: inset 0 -4px var(--siege-gold); }
+.lobby-tab .pixel-sprite { transition: transform var(--motion-hover) var(--motion-ease-out); }
+.lobby-tab.active .pixel-sprite { transform: translateY(-2px); }
 .lobby-tab.disabled,
 .lobby-tab.disabled:hover { color: #9a8266; background: transparent; box-shadow: none; opacity: .72; cursor: not-allowed; }
+
+@media (hover: hover) and (pointer: fine) {
+  .lobby-tab:not(.disabled):hover { color: var(--siege-parchment); background: rgba(211,165,59,.16); box-shadow: inset 0 -4px var(--siege-gold); }
+  .lobby-tab:not(.disabled):hover .pixel-sprite { transform: translateY(-2px); }
+}
 
 @media (max-width: 520px) {
   .lobby .match-buttons { grid-template-columns: 1fr; }
@@ -864,7 +1081,9 @@ body.menu-active { background: var(--siege-shadow); }
 }
 @media (prefers-reduced-motion: reduce) {
   .pixel-button,
-  .rating-track i { transition: none !important; }
+  .rating-track i,
+  .lobby-tabs__marker,
+  .lobby-tab .pixel-sprite { transform: none !important; transition: none !important; }
 }
 
 /* Phase 3 owner: medieval battlefield, layered defenses, and bounded event feedback. */
@@ -1102,7 +1321,26 @@ body.menu-active { background: var(--siege-shadow); }
 @media (prefers-reduced-motion: reduce) {
   .deck-screen *,
   .deck-screen *::before,
-  .deck-screen *::after { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
+  .deck-screen *::after,
+  .deck-overlay,
+  .deck-overlay *,
+  .deck-overlay *::before,
+  .deck-overlay *::after,
+  .deck-travel-clone,
+  .armory-filter-clone,
+  .deck-drag-avatar { animation: none !important; scroll-behavior: auto !important; transition: none !important; }
+  .deck-screen .deck-slot,
+  .deck-screen .deck-slot__select,
+  .deck-screen .deck-slot__info,
+  .deck-screen .weapon-option,
+  .deck-screen .weapon-option__select,
+  .deck-screen .library-card,
+  .deck-screen .library-card__select { transform: none !important; }
+  .deck-screen button:active,
+  .deck-overlay button:active { transform: none !important; }
+  .deck-travel-clone,
+  .armory-filter-clone,
+  .deck-drag-avatar { display: none !important; }
   .effect-delta { animation: none; outline: 3px solid currentColor; }
   .effect-burst { animation: none; opacity: 1; }
   .effect-family { animation: none !important; opacity: 1; outline-style: solid; filter: none; }
@@ -1231,16 +1469,19 @@ body.menu-active { background: var(--siege-shadow); }
 /* Phase 7 owner: release focus, contrast, and static state cues. */
 button:focus-visible,
 a:focus-visible,
+input:focus-visible,
+select:focus-visible,
 [role="button"]:focus-visible,
 #arena:focus-visible,
 #deck-builder-title:focus-visible,
+#deck-info-name:focus-visible,
+#deck-replace-title:focus-visible,
 #result-title:focus-visible {
   outline: 3px solid var(--siege-shadow) !important;
   outline-offset: 3px !important;
   box-shadow: 0 0 0 6px var(--siege-focus) !important;
 }
-.weapon-option.selected:focus-visible,
-.library-card__details[aria-current="true"]:focus-visible { outline-color: var(--siege-shadow) !important; }
+.weapon-option__select[aria-checked="true"]:focus-visible,
 .project-pending,
 .weapon-card.pending,
 .queued-action.pending { animation: none; }

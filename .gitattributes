@@ -1,0 +1,3 @@
+# Deterministic generated metadata is byte-compared by the asset test suite.
+public/assets/pixel/manifest.json text eol=lf
+public/assets/pixel/pixel-art.css text eol=lf

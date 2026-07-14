@@ -26,6 +26,7 @@ function actionUnavailable(element) {
   return Boolean(element?.disabled || element?.getAttribute("aria-disabled") === "true");
 }
 const SAVE_KEY = "taptics-prototype-v3";
+const MAX_SAVED_DECKS = 5;
 const PHASE_COPY = {
   fortify: { number: "01", kicker: "OPENING PHASE", name: "FORTIFY", rule: "Damage reduced 25%" },
   clash: { number: "02", kicker: "MIDDLE PHASE", name: "CLASH", rule: "Core shields are down" },
@@ -39,15 +40,32 @@ const CHALLENGES = [
 ];
 
 let profile = loadProfile();
+let builderDeckIndex = profile.selectedDeck;
 let builderDeck = [];
 let builderWeapon = "cannon";
 let builderFilter = "all";
-let builderDetailKey = null;
-let deckDraftActive = false;
+let builderSearch = "";
+let builderSort = "recommended";
+let activeDeckSlot = -1;
+let replacementCandidate = null;
+let deckUndoState = null;
+let deckKeyboardDrag = null;
+let deckPointerDrag = null;
+let suppressDeckClick = false;
+let deckMotionSequence = 0;
+let deckReflowSequence = 0;
+let deckTravelClone = null;
+let deckRemovalClone = null;
+let deckUndoTimer = null;
+let deckOpenedOnce = false;
+let deckHintDismissed = Boolean(profile.deckHintDismissed);
+let deckHeaderObserver = null;
+let deckBuilderLoaded = false;
 let deckCatalogueReady = false;
 let deckScrollTop = 0;
-let deckSaving = false;
 let deckStorageError = false;
+let expandedArmoryKey = null;
+const volatileBuilderLoadouts = new Map();
 let matchState = null;
 let ownSide = 1;
 let mode = "cpu";
@@ -68,8 +86,9 @@ let connectionInterrupted = false;
 let rematchPending = false;
 let hasConnected = false;
 
+function defaultLoadout() { return { deck: [...DATA.defaultDeck], weapon: "cannon", deckDraft: null }; }
 function defaultProfile() {
-  return { version: 5, duels: 0, wins: 0, run: 0, bestRun: 0, challenge: 0, challengeComplete: false, recent: [], deck: [...DATA.defaultDeck], weapon: "cannon", deckDraft: null };
+  return { version: 6, duels: 0, wins: 0, run: 0, bestRun: 0, challenge: 0, challengeComplete: false, recent: [], loadouts: Array.from({ length: MAX_SAVED_DECKS }, defaultLoadout), activeDeck: 0, selectedDeck: 0 };
 }
 function ownsDefinition(registry, key) { return typeof key === "string" && Object.hasOwn(registry, key); }
 function isValidDeck(deck) {
@@ -79,15 +98,28 @@ function isValidDeckDraft(draft) {
   return Boolean(draft) && Array.isArray(draft.deck) && draft.deck.length <= DATA.deckSize && new Set(draft.deck).size === draft.deck.length && draft.deck.every(key => ownsDefinition(DATA.cards, key)) && ownsDefinition(DATA.weapons, draft.weapon);
 }
 function sameOrderedDeck(left, right) { return left.length === right.length && left.every((key, index) => key === right[index]); }
+function normalizedLoadout(value, fallback = defaultLoadout()) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const deck = isValidDeck(source.deck) ? [...source.deck] : [...fallback.deck];
+  const weapon = ownsDefinition(DATA.weapons, source.weapon) ? source.weapon : fallback.weapon;
+  if (isValidDeckDraft(source.deckDraft) && isValidDeck(source.deckDraft.deck)) {
+    return { deck: [...source.deckDraft.deck], weapon: source.deckDraft.weapon, deckDraft: null };
+  }
+  const deckDraft = isValidDeckDraft(source.deckDraft) && (!sameOrderedDeck(source.deckDraft.deck, deck) || source.deckDraft.weapon !== weapon) ? { deck: [...source.deckDraft.deck], weapon: source.deckDraft.weapon } : null;
+  return { deck, weapon, deckDraft };
+}
 function loadProfile() {
   try {
     const parsed = JSON.parse(localStorage.getItem(SAVE_KEY));
     const base = defaultProfile();
     const saved = parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
-    const deck = isValidDeck(saved.deck) ? saved.deck : base.deck;
-    const weapon = ownsDefinition(DATA.weapons, saved.weapon) ? saved.weapon : "cannon";
-    const draft = isValidDeckDraft(saved.deckDraft) && (!sameOrderedDeck(saved.deckDraft.deck, deck) || saved.deckDraft.weapon !== weapon) ? { deck: [...saved.deckDraft.deck], weapon: saved.deckDraft.weapon } : null;
-    const normalized = { ...base, ...saved, version: 5, deck: [...deck], weapon, deckDraft: draft };
+    const legacyLoadout = normalizedLoadout({ deck: saved.deck, weapon: saved.weapon, deckDraft: saved.deckDraft });
+    const suppliedLoadouts = Array.isArray(saved.loadouts) ? saved.loadouts : null;
+    const loadouts = Array.from({ length: MAX_SAVED_DECKS }, (_, index) => normalizedLoadout(suppliedLoadouts && Object.hasOwn(suppliedLoadouts, index) ? suppliedLoadouts[index] : (!suppliedLoadouts && index === 0 ? legacyLoadout : null)));
+    const activeDeck = Number.isInteger(saved.activeDeck) && saved.activeDeck >= 0 && saved.activeDeck < MAX_SAVED_DECKS ? saved.activeDeck : 0;
+    const selectedDeck = Number.isInteger(saved.selectedDeck) && saved.selectedDeck >= 0 && saved.selectedDeck < MAX_SAVED_DECKS ? saved.selectedDeck : activeDeck;
+    const { deck: _legacyDeck, weapon: _legacyWeapon, deckDraft: _legacyDraft, loadouts: _savedLoadouts, activeDeck: _savedActiveDeck, selectedDeck: _savedSelectedDeck, ...savedProfile } = saved;
+    const normalized = { ...base, ...savedProfile, version: 6, loadouts, activeDeck, selectedDeck };
     localStorage.setItem(SAVE_KEY, JSON.stringify(normalized));
     return normalized;
   } catch {
@@ -112,7 +144,11 @@ function formatTime(seconds) {
   const value = Math.max(0, Math.floor(seconds));
   return `${Math.floor(value / 60)}:${String(value % 60).padStart(2, "0")}`;
 }
-function loadout() { return { deck: [...profile.deck], weapon: profile.weapon }; }
+function savedLoadout(index = profile.activeDeck) { return profile.loadouts[index] || profile.loadouts[0]; }
+function loadout() {
+  const active = savedLoadout();
+  return { deck: [...active.deck], weapon: active.weapon };
+}
 function currentRating() { return Math.max(0, 1000 + profile.wins * 30 - (profile.duels - profile.wins) * 20); }
 function resultPresentation({ winner, reason } = {}, side = ownSide, interruption = false) {
   if (interruption) return Object.freeze({ outcome: "interrupted", title: "CONNECTION LOST", reason: "MATCH INTERRUPTED", copy: "This duel cannot be resumed. Your local record was not changed.", emblem: "status-warning", warning: true, tone: 120 });
@@ -161,13 +197,18 @@ function closeLifecycleDialog(dialog, { restoreFocus = true } = {}) {
 function closeAllLifecycleDialogs() {
   $("#leave-modal").classList.add("hidden");
   $("#result-modal").classList.add("hidden");
+  $("#deck-info-modal").classList.add("hidden");
+  $("#deck-replace-modal").classList.add("hidden");
+  if (replacementCandidate) $(`[data-library-card="${replacementCandidate}"]`)?.classList.remove("is-replacement-candidate");
+  replacementCandidate = null;
   activeDialog = null;
   dialogReturnFocus = null;
   setBackgroundInert(false);
   clearResultParticles();
+  clearDeckMotion();
 }
 
-const CARD_FRAME_VARIANTS = new Set(["lobby", "battle", "queued", "deck", "detail"]);
+const CARD_FRAME_VARIANTS = new Set(["lobby", "battle", "queued", "deck", "armory", "detail"]);
 function escapeMarkup(value) {
   return String(value).replace(/[&<>"']/g, character => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]);
 }
@@ -243,8 +284,9 @@ function renderProfile() {
   renderLobbyLoadout();
 }
 function renderLobbyLoadout() {
-  $("#loadout-deck").innerHTML = profile.deck.map(key => cardFrame(key, { variant: "lobby" })).join("");
-  const weapon = DATA.weapons[profile.weapon];
+  const active = savedLoadout();
+  $("#loadout-deck").innerHTML = active.deck.map(key => cardFrame(key, { variant: "lobby" })).join("");
+  const weapon = DATA.weapons[active.weapon];
   $("#loadout-weapon-name").textContent = weapon.name.toUpperCase();
   $("#loadout-weapon-copy").textContent = `${weapon.cost} taps - ${weapon.description}`;
 }
@@ -261,19 +303,33 @@ function setMenuTab(tab) {
   }
 }
 function deckIsDirty() {
-  return deckDraftActive && (builderWeapon !== profile.weapon || !sameOrderedDeck(builderDeck, profile.deck));
+  const saved = savedLoadout(builderDeckIndex);
+  return deckBuilderLoaded && (builderWeapon !== saved.weapon || !sameOrderedDeck(builderDeck, saved.deck));
 }
-function persistDeckDraft() {
-  const deckDraft = deckIsDirty() ? { deck: [...builderDeck], weapon: builderWeapon } : null;
-  const candidate = { ...profile, deckDraft };
-  if (!saveProfile(candidate)) {
+function loadoutWithEditorState(saved, editor) {
+  const complete = isValidDeck(editor.deck) && ownsDefinition(DATA.weapons, editor.weapon);
+  return complete ? { deck: [...editor.deck], weapon: editor.weapon, deckDraft: null } : { ...saved, deckDraft: { deck: [...editor.deck], weapon: editor.weapon } };
+}
+function loadoutsWithPendingEdits() {
+  return profile.loadouts.map((saved, index) => {
+    const editor = volatileBuilderLoadouts.get(index);
+    return editor ? loadoutWithEditorState(saved, editor) : saved;
+  });
+}
+function autoSaveBuilderDeck() {
+  volatileBuilderLoadouts.set(builderDeckIndex, { deck: [...builderDeck], weapon: builderWeapon });
+  const candidate = { ...profile, version: 6, loadouts: loadoutsWithPendingEdits(), activeDeck: builderDeckIndex, selectedDeck: builderDeckIndex };
+  const saved = saveProfile(candidate);
+  if (!saved) {
     const firstFailure = !deckStorageError;
     deckStorageError = true;
-    if (firstFailure) toast("BROWSER STORAGE UNAVAILABLE - DRAFT KEPT IN MEMORY");
+    if (firstFailure) toast("AUTO-SAVE UNAVAILABLE - EDIT KEPT IN MEMORY");
     return false;
   }
   profile = candidate;
+  volatileBuilderLoadouts.clear();
   deckStorageError = false;
+  renderProfile();
   return true;
 }
 function announceDeck(message) {
@@ -319,11 +375,12 @@ function showLobby() {
   $("#lobby").classList.remove("hidden");
   $("#main-menu-tabs").classList.remove("hidden");
   document.body.classList.add("menu-active");
+  document.body.classList.remove("deck-active");
   $(".lobby-scroll").scrollTop = 0;
   setMenuTab("battle");
   window.scrollTo({ top: 0, behavior: "auto" });
   renderProfile();
-  if (leavingDeck && deckIsDirty()) toast("DECK DRAFT KEPT - BATTLES USE SAVED LOADOUT");
+  if (leavingDeck && deckIsDirty()) toast(`DECK ${builderDeckIndex + 1} EDIT KEPT - BATTLE USES THE LAST AUTO-SAVED ACTIVE LOADOUT`);
 }
 function showGame() {
   if (!$("#deck-screen").classList.contains("hidden")) deckScrollTop = $("#deck-screen").scrollTop;
@@ -340,7 +397,7 @@ function showGame() {
   $("#lobby").classList.add("hidden");
   $("#deck-screen").classList.add("hidden");
   $("#main-menu-tabs").classList.add("hidden");
-  document.body.classList.remove("menu-active");
+  document.body.classList.remove("menu-active", "deck-active");
   $("#game").classList.remove("hidden");
   $("#mode-label").textContent = mode === "cpu" ? "TRAINING" : "ONLINE";
   window.scrollTo({ top: 0, behavior: "auto" });
@@ -381,201 +438,891 @@ function toggleOnlineQueue() {
   announceLifecycle("Matchmaking started. Press Search for Battle again to cancel.");
 }
 
+function loadBuilderDeck(index) {
+  const saved = savedLoadout(index);
+  const volatile = volatileBuilderLoadouts.get(index);
+  const editor = volatile || (isValidDeckDraft(saved.deckDraft) ? saved.deckDraft : saved);
+  builderDeckIndex = index;
+  builderDeck = [...editor.deck];
+  builderWeapon = editor.weapon;
+}
+function switchBuilderDeck(index, { focus = true } = {}) {
+  if (!Number.isInteger(index) || index < 0 || index >= MAX_SAVED_DECKS) return false;
+  if (index === builderDeckIndex) {
+    if (focus) $(`[data-deck-tab="${index}"]`)?.focus({ preventScroll: true });
+    return false;
+  }
+  clearDeckMotion();
+  clearDeckUndo();
+  activeDeckSlot = -1;
+  expandedArmoryKey = null;
+  replacementCandidate = null;
+  const candidate = { ...profile, version: 6, loadouts: loadoutsWithPendingEdits(), activeDeck: index, selectedDeck: index };
+  const saved = saveProfile(candidate);
+  if (saved) {
+    profile = candidate;
+    volatileBuilderLoadouts.clear();
+    deckStorageError = false;
+    renderProfile();
+  } else {
+    deckStorageError = true;
+    toast("DECK SWITCH KEPT IN MEMORY - AUTO-SAVE UNAVAILABLE");
+  }
+  loadBuilderDeck(index);
+  renderDeckBuilder({ animateLibrary: true });
+  if (focus) requestAnimationFrame(() => $(`[data-deck-tab="${index}"]`)?.focus({ preventScroll: true }));
+  const incomplete = !isValidDeck(builderDeck);
+  announceDeck(saved ? `Deck ${index + 1} selected${incomplete ? ". Its incomplete edit is open; battles use its last complete version until all six cards are present." : " and active for battle."}` : `Deck ${index + 1} is open in memory. Battle still uses auto-saved Deck ${profile.activeDeck + 1}.`);
+  return true;
+}
 function openDeckBuilder() {
-  const continuingDraft = deckDraftActive;
+  const continuingDraft = deckBuilderLoaded;
   const canceledSearch = searching;
   if (canceledSearch) {
     socket.emit("cancelSearch");
     searching = false;
     renderQueueState();
   }
-  if (!deckDraftActive) {
-    const savedDraft = isValidDeckDraft(profile.deckDraft) ? profile.deckDraft : null;
-    builderDeck = [...(savedDraft?.deck || profile.deck)];
-    builderWeapon = savedDraft?.weapon || profile.weapon;
-    builderDetailKey = builderDeck[0] || Object.keys(DATA.cards)[0];
-    deckDraftActive = true;
+  if (!deckBuilderLoaded) {
+    loadBuilderDeck(profile.selectedDeck);
+    deckBuilderLoaded = true;
+    if (isValidDeck(builderDeck) && deckIsDirty()) autoSaveBuilderDeck();
   }
+  activeDeckSlot = -1;
+  expandedArmoryKey = null;
+  replacementCandidate = null;
+  clearDeckMotion();
   ensureDeckCatalogue();
   renderDeckBuilder();
   $("#lobby").classList.add("hidden");
-  $("#deck-screen").classList.remove("hidden");
+  const deckScreen = $("#deck-screen");
+  deckScreen.classList.remove("hidden", "is-entering", "is-returning");
+  observeDeckLayoutMetrics();
+  deckScreen.classList.add(deckOpenedOnce ? "is-returning" : "is-entering");
+  deckOpenedOnce = true;
   $("#main-menu-tabs").classList.remove("hidden");
-  document.body.classList.add("menu-active");
-  $("#deck-screen").scrollTop = continuingDraft ? deckScrollTop : 0;
+  document.body.classList.add("menu-active", "deck-active");
+  deckScreen.scrollTop = continuingDraft ? deckScrollTop : 0;
+  requestAnimationFrame(() => { deckScreen.scrollTop = continuingDraft ? deckScrollTop : 0; });
+  setTimeout(() => deckScreen.classList.remove("is-entering", "is-returning"), 320);
   setMenuTab("deck");
   $("#deck-builder-title").focus({ preventScroll: true });
   if (canceledSearch) {
     announceDeck("Matchmaking canceled so you can edit the saved loadout safely.");
   }
 }
+const DECK_CATEGORIES = ["attack", "crew", "magic"];
+function syncDeckLayoutMetrics() {
+  const screen = $("#deck-screen");
+  const header = screen.querySelector(".deck-screen-header");
+  const height = Math.ceil(header.getBoundingClientRect().height);
+  if (height > 0) screen.style.setProperty("--deck-header-height", `${height}px`);
+}
+function observeDeckLayoutMetrics() {
+  syncDeckLayoutMetrics();
+  if (deckHeaderObserver || typeof ResizeObserver !== "function") return;
+  deckHeaderObserver = new ResizeObserver(syncDeckLayoutMetrics);
+  deckHeaderObserver.observe($("#deck-screen .deck-screen-header"));
+}
+function reducedDeckMotion() { return matchMedia("(prefers-reduced-motion: reduce)").matches; }
+function deckPosition(key) { return builderDeck.indexOf(key); }
+function headlineStats(key, source = "card") {
+  const registry = source === "weapon" ? DATA.weaponStats : DATA.cardStats;
+  return (registry[key] || []).slice(0, 2);
+}
+function headlineStatsMarkup(key, source = "card") {
+  return headlineStats(key, source).map(stat => `<b>${escapeMarkup(stat)}</b>`).join("");
+}
+function deckSlotMarkup(index) {
+  return `<article class="deck-slot empty" data-deck-slot="${index}" data-card-key="" role="listitem"><span class="deck-slot-order" aria-hidden="true">#${index + 1}</span><button class="deck-slot__select library-card__select" type="button" data-slot-action="select" data-card-key="" aria-expanded="false" aria-controls="deck-slot-actions-${index}" aria-grabbed="false"><span class="deck-slot__frame" aria-hidden="true"></span><span class="library-card__strengths deck-slot__strengths" aria-hidden="true"></span></button><div id="deck-slot-actions-${index}" class="card-action-popover deck-slot__actions" role="group" aria-label="Card actions" hidden><button class="deck-slot__info card-action-popover__info pixel-button" type="button" data-slot-action="info" data-card-key="">INFO</button><button class="deck-slot__remove card-action-popover__remove pixel-button" type="button" data-slot-action="remove" data-card-key="">REMOVE</button></div><button class="deck-slot__empty pixel-button" type="button" data-slot-action="empty" data-slot-index="${index}"><b aria-hidden="true">+</b><span>ADD CARD</span></button><span class="deck-insertion-marker" aria-hidden="true">#${index + 1}</span></article>`;
+}
 function ensureDeckCatalogue() {
   if (deckCatalogueReady) return;
-  $("#weapon-options").innerHTML = Object.entries(DATA.weapons).map(([key, weapon]) => `<button class="weapon-option" type="button" data-weapon="${key}" aria-pressed="false" aria-label="Select ${escapeMarkup(weapon.name)} as permanent weapon">${cardFrame(key, { variant: "deck", source: "weapon" })}<small>${escapeMarkup(weapon.description)}</small></button>`).join("");
-  $("#builder-deck").innerHTML = Array.from({ length: DATA.deckSize }, (_, index) => `<article class="deck-slot" data-deck-slot="${index}" role="listitem"></article>`).join("");
-  $("#card-library").innerHTML = Object.entries(DATA.cards).map(([key, card]) => `<article class="library-card category-${card.category}" data-library-card="${key}" data-card-category="${card.category}" style="--card-color:${card.color};--category-color:${DATA.categories[card.category].color}"><button class="library-card__details" type="button" data-card-action="details" aria-label="View details for ${escapeMarkup(card.name)}">${cardFrame(key, { variant: "deck" })}</button><button class="library-card__toggle pixel-button" type="button" data-card-action="toggle" aria-pressed="false">ADD TO DECK</button></article>`).join("");
+  $("#weapon-options").innerHTML = Object.entries(DATA.weapons).map(([key, weapon]) => `<article class="weapon-option" data-weapon-root="${key}"><button class="weapon-option__select" type="button" role="radio" data-weapon="${key}" data-weapon-action="select" aria-checked="false" aria-label="Select ${escapeMarkup(weapon.name)} as permanent weapon">${cardFrame(key, { variant: "armory", source: "weapon" })}<span class="weapon-option__strengths library-card__strengths">${headlineStatsMarkup(key, "weapon")}</span><span class="weapon-option__availability">ALWAYS AVAILABLE</span></button><button class="card-info-button weapon-option__info pixel-button" type="button" data-weapon-action="info" data-info-source="weapon" data-info-key="${key}" aria-label="Info for ${escapeMarkup(weapon.name)}">INFO</button></article>`).join("");
+  $("#builder-deck").innerHTML = `<section class="deck-cycle-row" aria-labelledby="opening-hand-label"><h3 id="opening-hand-label" class="deck-cycle-row__label">OPENING HAND <span>POSITIONS 1-3</span></h3><div class="deck-cycle-cards" role="list" aria-label="Opening hand draw positions">${Array.from({ length: 3 }, (_, index) => deckSlotMarkup(index)).join("")}</div></section><section class="deck-cycle-row" aria-labelledby="next-cycle-label"><h3 id="next-cycle-label" class="deck-cycle-row__label">NEXT IN CYCLE <span>POSITIONS 4-6</span></h3><div class="deck-cycle-cards" role="list" aria-label="Next draw positions">${Array.from({ length: 3 }, (_, index) => deckSlotMarkup(index + 3)).join("")}</div></section>`;
+  $("#card-library").innerHTML = DECK_CATEGORIES.map(category => `<section class="armory-group category-${category}" data-armory-group="${category}" aria-labelledby="armory-${category}-title"><h3 id="armory-${category}-title" class="armory-group__heading">${DATA.categories[category].name.toUpperCase()} <span data-armory-group-count="${category}">0</span></h3><div class="armory-grid" data-armory-grid="${category}"></div></section>`).join("");
+  Object.entries(DATA.cards).forEach(([key, card], recommendedIndex) => {
+    const entry = document.createElement("article");
+    entry.className = `library-card category-${card.category}`;
+    entry.dataset.libraryCard = key;
+    entry.dataset.cardCategory = card.category;
+    entry.dataset.cardName = card.name.toLocaleLowerCase();
+    entry.dataset.cardCost = String(card.cost);
+    entry.dataset.recommendedIndex = String(recommendedIndex);
+    entry.style.setProperty("--card-color", card.color);
+    entry.style.setProperty("--category-color", DATA.categories[card.category].color);
+    entry.innerHTML = `<button class="library-card__select" type="button" data-card-action="toggle" aria-expanded="false" aria-controls="armory-actions-${key}" aria-label="${escapeMarkup(card.name)}. Show card actions.">${cardFrame(key, { variant: "armory" })}<span class="library-card__strengths" aria-hidden="true">${headlineStatsMarkup(key)}</span></button><div id="armory-actions-${key}" class="card-action-popover library-card__actions" role="group" aria-label="Actions for ${escapeMarkup(card.name)}" hidden><button class="card-action-popover__info pixel-button" type="button" data-card-action="info" data-info-source="card" data-info-key="${key}">INFO</button><button class="card-action-popover__primary pixel-button" type="button" data-card-action="choose">CHOOSE POSITION</button></div>`;
+    $(`[data-armory-grid="${card.category}"]`).append(entry);
+  });
   deckCatalogueReady = true;
 }
-function focusDeckSlot(key, action = "details") {
+function focusDeckSlot(key, action = "select") {
   requestAnimationFrame(() => $(`#builder-deck [data-card-key="${key}"][data-slot-action="${action}"]`)?.focus({ preventScroll: true }));
+}
+function focusDeckSlotIndex(index, action = "empty") {
+  requestAnimationFrame(() => $(`#builder-deck [data-deck-slot="${index}"] [data-slot-action="${action}"]`)?.focus({ preventScroll: true }));
 }
 function updateDeckSlots(focus = null) {
   $$("#builder-deck [data-deck-slot]").forEach((slot, index) => {
     const key = builderDeck[index];
     slot.dataset.cardKey = key || "";
-    if (!key) {
-      slot.className = "deck-slot empty";
-      slot.innerHTML = `<span class="deck-slot-order">${index + 1}</span><div class="deck-slot-empty" aria-label="Empty deck slot ${index + 1}"><b>+</b><small>SLOT ${index + 1}</small></div>`;
-      return;
+    const selected = index === activeDeckSlot;
+    const main = slot.querySelector(".deck-slot__select");
+    const frameSlot = slot.querySelector(".deck-slot__frame");
+    const strengths = slot.querySelector(".deck-slot__strengths");
+    const actions = slot.querySelector(".deck-slot__actions");
+    const info = slot.querySelector(".deck-slot__info");
+    const remove = slot.querySelector(".deck-slot__remove");
+    const empty = slot.querySelector(".deck-slot__empty");
+    if (slot.dataset.renderedKey !== (key || "")) {
+      frameSlot.innerHTML = key ? cardFrame(key, { variant: "armory" }) : "";
+      strengths.innerHTML = key ? headlineStatsMarkup(key) : "";
+      slot.dataset.renderedKey = key || "";
     }
-    const card = DATA.cards[key];
-    slot.className = `deck-slot filled category-${card.category}`;
-    slot.innerHTML = `<span class="deck-slot-order" aria-hidden="true">${index + 1}</span><button class="deck-slot-card" type="button" data-slot-action="details" data-card-key="${key}" aria-label="View ${escapeMarkup(card.name)} details, position ${index + 1}">${cardFrame(key, { variant: "deck", selected: true })}</button><div class="deck-slot-actions"><button type="button" data-slot-action="left" data-card-key="${key}" aria-label="Move ${escapeMarkup(card.name)} left from position ${index + 1}" ${index === 0 ? "disabled" : ""}>&larr;</button><button type="button" data-slot-action="remove" data-card-key="${key}" aria-label="Remove ${escapeMarkup(card.name)} from deck">&times;</button><button type="button" data-slot-action="right" data-card-key="${key}" aria-label="Move ${escapeMarkup(card.name)} right from position ${index + 1}" ${index === builderDeck.length - 1 ? "disabled" : ""}>&rarr;</button></div>`;
+    slot.classList.toggle("empty", !key);
+    slot.classList.toggle("filled", Boolean(key));
+    slot.classList.toggle("is-active", selected);
+    slot.classList.toggle("is-expanded", selected);
+    DECK_CATEGORIES.forEach(category => slot.classList.toggle(`category-${category}`, DATA.cards[key]?.category === category));
+    main.hidden = !key;
+    actions.hidden = !selected || !key;
+    empty.hidden = Boolean(key);
+    if (key) {
+      const card = DATA.cards[key];
+      for (const control of [main, info, remove]) control.dataset.cardKey = key;
+      main.setAttribute("aria-label", `${card.name}, draw position ${index + 1}. Activate to show Info and Remove. Hold the card to drag it, or press Space to pick it up for keyboard reordering.`);
+      main.setAttribute("aria-expanded", String(selected));
+      main.setAttribute("aria-grabbed", String(deckKeyboardDrag?.key === key));
+      info.setAttribute("aria-label", `Info for ${card.name}, draw position ${index + 1}`);
+      remove.setAttribute("aria-label", `Remove ${card.name} from draw position ${index + 1}`);
+    } else {
+      const isNextPosition = index === builderDeck.length;
+      main.setAttribute("aria-expanded", "false");
+      main.setAttribute("aria-grabbed", "false");
+      empty.disabled = !isNextPosition;
+      empty.querySelector("span").textContent = isNextPosition ? "ADD CARD" : `FILL #${builderDeck.length + 1} FIRST`;
+      empty.setAttribute("aria-label", isNextPosition ? `Empty draw position ${index + 1}. Choose a card from the Armory.` : `Empty draw position ${index + 1}. Fill draw position ${builderDeck.length + 1} first.`);
+    }
   });
-  if (focus?.key) focusDeckSlot(focus.key, focus.action);
+  if (focus?.key) focusDeckSlot(focus.key, focus.action || "select");
+  else if (Number.isInteger(focus?.index)) focusDeckSlotIndex(focus.index, focus.action || "empty");
 }
 function updateWeaponOptions() {
   $$("#weapon-options [data-weapon]").forEach(button => {
     const selected = button.dataset.weapon === builderWeapon;
-    button.classList.toggle("selected", selected);
-    button.setAttribute("aria-pressed", String(selected));
+    button.closest(".weapon-option").classList.toggle("selected", selected);
+    button.setAttribute("aria-checked", String(selected));
+    button.tabIndex = selected ? 0 : -1;
     button.querySelector(".card-frame")?.classList.toggle("is-selected", selected);
   });
 }
-function updateLibraryState() {
-  const full = builderDeck.length === DATA.deckSize;
-  let visible = 0;
-  $$("#card-library [data-library-card]").forEach(entry => {
-    const key = entry.dataset.libraryCard;
-    const selected = builderDeck.includes(key);
-    const shown = builderFilter === "all" || entry.dataset.cardCategory === builderFilter;
-    entry.hidden = !shown;
-    if (shown) visible++;
-    entry.classList.toggle("selected", selected);
-    entry.querySelector(".card-frame")?.classList.toggle("is-selected", selected);
-    const details = entry.querySelector('[data-card-action="details"]');
-    if (key === builderDetailKey) details.setAttribute("aria-current", "true");
-    else details.removeAttribute("aria-current");
-    const toggle = entry.querySelector('[data-card-action="toggle"]');
-    toggle.disabled = full && !selected;
-    toggle.setAttribute("aria-pressed", String(selected));
-    toggle.textContent = selected ? "REMOVE" : full ? "DECK FULL" : "ADD TO DECK";
-    toggle.setAttribute("aria-label", selected ? `Remove ${DATA.cards[key].name} from deck` : full ? `Deck full. View ${DATA.cards[key].name} details or remove another card first` : `Add ${DATA.cards[key].name} to deck`);
+function updateDeckTabs() {
+  $$("#deck-tabs [data-deck-tab]").forEach(button => {
+    const index = Number(button.dataset.deckTab);
+    const selected = index === builderDeckIndex;
+    const active = index === profile.activeDeck;
+    const record = savedLoadout(index);
+    const hasDraft = Boolean(record.deckDraft);
+    const pendingStorage = volatileBuilderLoadouts.has(index);
+    button.classList.toggle("is-active", active);
+    button.classList.toggle("has-draft", hasDraft);
+    button.classList.toggle("has-storage-error", pendingStorage);
+    button.setAttribute("aria-selected", String(selected));
+    button.tabIndex = selected ? 0 : -1;
+    button.querySelector("small").textContent = pendingStorage ? "MEMORY" : hasDraft ? "EDITING" : active ? "ACTIVE" : "READY";
+    button.setAttribute("aria-label", `Deck ${index + 1}${active ? ", active for battle" : ""}${pendingStorage ? ", edit kept in memory while auto-save is unavailable" : hasDraft ? ", incomplete edit auto-saved" : ", ready"}`);
   });
-  $("#library-count").textContent = builderFilter === "all" ? `${visible} CARDS` : `${visible} / ${Object.keys(DATA.cards).length}`;
-  $$("#deck-filters [data-deck-filter]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.deckFilter === builderFilter)));
 }
-function renderDeckDetails(key = builderDetailKey, restoreToggleFocus = false) {
-  if (!ownsDefinition(DATA.cards, key)) return;
-  builderDetailKey = key;
-  const card = DATA.cards[key];
-  const category = DATA.categories[card.category];
-  $("#deck-detail-frame").innerHTML = cardFrame(key, { variant: "detail", selected: builderDeck.includes(key) });
-  $("#deck-detail-category").textContent = `${category.name.toUpperCase()} / ${card.type.toUpperCase()} / ${card.cost} TAPS`;
-  $("#deck-detail-name").textContent = card.name.toUpperCase();
-  $("#deck-detail-description").textContent = card.description;
-  $("#deck-detail-stats").innerHTML = (DATA.cardStats[key] || []).map(stat => `<b>${escapeMarkup(stat)}</b>`).join("");
-  const selected = builderDeck.includes(key);
-  const toggle = $("#deck-detail-toggle");
-  toggle.disabled = builderDeck.length === DATA.deckSize && !selected;
-  toggle.dataset.cardKey = key;
-  toggle.setAttribute("aria-pressed", String(selected));
-  toggle.textContent = selected ? "REMOVE FROM DECK" : builderDeck.length === DATA.deckSize ? "DECK FULL" : "ADD TO DECK";
-  toggle.setAttribute("aria-label", selected ? `Remove ${card.name} from deck` : builderDeck.length === DATA.deckSize ? `Deck full. Remove another card before adding ${card.name}` : `Add ${card.name} to deck`);
-  updateLibraryState();
-  if (restoreToggleFocus) requestAnimationFrame(() => toggle.focus({ preventScroll: true }));
+function animateArmoryLayout(firstRects, previouslyVisible) {
+  if (!firstRects || reducedDeckMotion()) return;
+  const sequence = ++deckMotionSequence;
+  requestAnimationFrame(() => {
+    if (sequence !== deckMotionSequence) return;
+    const viewport = $("#deck-screen").getBoundingClientRect();
+    $$("#card-library [data-library-card]:not([hidden])").forEach(entry => {
+      const first = firstRects.get(entry);
+      const last = entry.getBoundingClientRect();
+      if (last.bottom < viewport.top || last.top > viewport.bottom) return;
+      if (first) {
+        const x = Math.round(first.left - last.left);
+        const y = Math.round(first.top - last.top);
+        if (x || y) entry.animate([{ transform: `translate(${x}px, ${y}px)`, opacity: .72 }, { transform: "translate(0, 0)", opacity: 1 }], { duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" });
+      } else if (!previouslyVisible.has(entry)) entry.animate([{ opacity: 0, transform: "translateY(6px)" }, { opacity: 1, transform: "translateY(0)" }], { duration: 160, easing: "ease-out" });
+    });
+  });
+}
+function animateArmoryDepartures(entries, desiredVisibility) {
+  const viewport = $("#deck-screen").getBoundingClientRect();
+  entries.filter(entry => !entry.hidden && !desiredVisibility.get(entry)).filter(entry => {
+    const rect = entry.getBoundingClientRect();
+    return rect.width && rect.height && rect.bottom >= viewport.top && rect.top <= viewport.bottom;
+  }).slice(0, 8).forEach(entry => {
+    const rect = entry.getBoundingClientRect();
+    const clone = entry.cloneNode(true);
+    clone.classList.add("armory-filter-clone");
+    clone.removeAttribute("data-library-card");
+    clone.inert = true;
+    clone.setAttribute("aria-hidden", "true");
+    Object.assign(clone.style, { left: `${Math.round(rect.left)}px`, top: `${Math.round(rect.top)}px`, width: `${Math.round(rect.width)}px`, height: `${Math.round(rect.height)}px` });
+    $("#deck-screen").append(clone);
+    const animation = clone.animate([{ transform: "translateY(0)", opacity: 1 }, { transform: "translateY(-8px)", opacity: 0 }], { duration: 150, easing: "ease-out" });
+    animation.finished.catch(() => {}).finally(() => clone.remove());
+  });
+}
+function updateLibraryState(options = {}) {
+  const entries = $$("#card-library [data-library-card]");
+  const query = builderSearch.trim().toLocaleLowerCase();
+  const desiredVisibility = new Map(entries.map(entry => [entry, (builderFilter === "all" || builderFilter === entry.dataset.cardCategory) && (!query || entry.dataset.cardName.includes(query))]));
+  if (expandedArmoryKey && !desiredVisibility.get($(`[data-library-card="${expandedArmoryKey}"]`))) expandedArmoryKey = null;
+  const animate = Boolean(options.animate) && !reducedDeckMotion();
+  if (!animate) deckMotionSequence++;
+  const firstRects = animate ? new Map(entries.filter(entry => !entry.hidden).map(entry => [entry, entry.getBoundingClientRect()])) : null;
+  const previouslyVisible = new Set(entries.filter(entry => !entry.hidden));
+  entries.forEach(entry => entry.getAnimations().forEach(animation => animation.cancel()));
+  document.querySelectorAll(".armory-filter-clone").forEach(element => element.remove());
+  if (animate) animateArmoryDepartures(entries, desiredVisibility);
+  let visible = 0;
+  for (const category of DECK_CATEGORIES) {
+    const group = $(`[data-armory-group="${category}"]`);
+    const grid = $(`[data-armory-grid="${category}"]`);
+    const categoryEntries = entries.filter(entry => entry.dataset.cardCategory === category).sort((left, right) => {
+      if (builderSort === "cost-asc") return Number(left.dataset.cardCost) - Number(right.dataset.cardCost) || left.dataset.cardName.localeCompare(right.dataset.cardName);
+      if (builderSort === "cost-desc") return Number(right.dataset.cardCost) - Number(left.dataset.cardCost) || left.dataset.cardName.localeCompare(right.dataset.cardName);
+      if (builderSort === "name") return left.dataset.cardName.localeCompare(right.dataset.cardName);
+      return Number(left.dataset.recommendedIndex) - Number(right.dataset.recommendedIndex);
+    });
+    categoryEntries.forEach(entry => grid.append(entry));
+    let groupVisible = 0;
+    categoryEntries.forEach(entry => {
+      const key = entry.dataset.libraryCard;
+      const card = DATA.cards[key];
+      const position = deckPosition(key);
+      const shown = desiredVisibility.get(entry);
+      entry.hidden = !shown;
+      if (shown) { visible++; groupVisible++; }
+      const expanded = key === expandedArmoryKey;
+      entry.classList.toggle("is-in-deck", position >= 0);
+      entry.classList.toggle("is-expanded", expanded);
+      const face = entry.querySelector('[data-card-action="toggle"]');
+      const actions = entry.querySelector(".library-card__actions");
+      const choose = entry.querySelector('[data-card-action="choose"], [data-card-action="locate"]');
+      face.setAttribute("aria-expanded", String(expanded));
+      face.setAttribute("aria-label", position >= 0 ? `${card.name}, in Deck ${builderDeckIndex + 1} at draw position ${position + 1}. Show Info and deck position.` : `${card.name}, not in Deck ${builderDeckIndex + 1}. Show Info and Choose Position.`);
+      actions.hidden = !expanded;
+      if (position >= 0) {
+        choose.dataset.cardAction = "locate";
+        choose.textContent = `IN DECK #${position + 1}`;
+        choose.setAttribute("aria-label", `${card.name} is already in draw position ${position + 1}. Identify that position.`);
+      } else {
+        choose.dataset.cardAction = "choose";
+        choose.textContent = "CHOOSE POSITION";
+        choose.setAttribute("aria-label", `Choose a draw position for ${card.name}`);
+      }
+    });
+    group.hidden = groupVisible === 0;
+    $(`[data-armory-group-count="${category}"]`).textContent = `- ${groupVisible}`;
+  }
+  $("#library-count").textContent = `${visible} ${visible === 1 ? "CARD" : "CARDS"}`;
+  $$("#deck-filters [data-deck-filter]").forEach(button => button.setAttribute("aria-pressed", String(button.dataset.deckFilter === builderFilter)));
+  $("#deck-search").value = builderSearch;
+  $("#deck-sort").value = builderSort;
+  $("#clear-deck-search").classList.toggle("hidden", !builderSearch);
+  $("#armory-no-results").classList.toggle("hidden", visible !== 0);
+  animateArmoryLayout(firstRects, previouslyVisible);
+}
+function setDeckSummaryValue(selector, value) {
+  const element = $(selector);
+  const text = String(value);
+  if (element.textContent === text) return;
+  element.textContent = text;
+  element.parentElement.classList.remove("is-updated");
+  requestAnimationFrame(() => element.parentElement.classList.add("is-updated"));
+  setTimeout(() => element.parentElement.classList.remove("is-updated"), reducedDeckMotion() ? 40 : 320);
+}
+function updateDeckSummary() {
+  const total = builderDeck.reduce((sum, key) => sum + DATA.cards[key].cost, 0);
+  const counts = Object.fromEntries(DECK_CATEGORIES.map(category => [category, builderDeck.filter(key => DATA.cards[key].category === category).length]));
+  setDeckSummaryValue("#deck-average-cost", builderDeck.length ? (total / builderDeck.length).toFixed(1) : "0.0");
+  setDeckSummaryValue("#deck-attack-count", counts.attack);
+  setDeckSummaryValue("#deck-crew-count", counts.crew);
+  setDeckSummaryValue("#deck-magic-count", counts.magic);
+  const missing = DATA.deckSize - builderDeck.length;
+  setDeckSummaryValue("#deck-readiness", missing ? `${missing} ${missing === 1 ? "CARD" : "CARDS"} MISSING` : `${DATA.deckSize} / ${DATA.deckSize} READY`);
+}
+function updateDeckUndo() {
+  $("#deck-undo").classList.toggle("hidden", !deckUndoState);
+  $("#deck-undo").parentElement.classList.toggle("hidden", !deckUndoState);
+  if (deckUndoState) $("#deck-undo-copy").textContent = deckUndoState.copy;
 }
 function updateDeckStatus() {
   const valid = isValidDeck(builderDeck) && ownsDefinition(DATA.weapons, builderWeapon);
-  const dirty = deckIsDirty();
-  const state = deckStorageError ? "error" : deckSaving ? "saving" : !valid ? "invalid" : dirty ? "dirty" : "saved";
+  const state = deckStorageError ? "error" : !valid ? "invalid" : "saved";
   const status = $("#deck-status");
+  const missing = DATA.deckSize - builderDeck.length;
+  const copy = state === "error" ? `Auto-save unavailable. Deck ${builderDeckIndex + 1}'s edit is kept in memory; battles use the last auto-saved active loadout.` : state === "invalid" ? `Deck ${builderDeckIndex + 1} edit auto-saved - ${missing} ${missing === 1 ? "card" : "cards"} still needed. Battles use its last complete version.` : `Deck ${builderDeckIndex + 1} is auto-saved and ready for battle.`;
+  if ($("#deck-status-copy").textContent !== copy) {
+    $("#deck-status-copy").textContent = copy;
+    status.classList.remove("is-changing");
+    requestAnimationFrame(() => status.classList.add("is-changing"));
+  }
   status.dataset.state = state;
-  status.textContent = state === "error" ? `Browser storage is unavailable. This ${valid ? "loadout" : "draft"} is only in memory; battles still use the last saved loadout.` : state === "invalid" ? `${builderDeck.length} of ${DATA.deckSize} cards selected. Choose ${DATA.deckSize - builderDeck.length} more.` : state === "dirty" ? "Unsaved draft preserved. Save before battle to use this exact order." : state === "saving" ? "Sealing loadout..." : "Loadout saved and ready for battle.";
-  $("#builder-count").textContent = `${builderDeck.length} / ${DATA.deckSize}${valid ? " - VALID" : ""}`;
-  const save = $("#save-deck");
-  save.disabled = !valid || !dirty || deckSaving;
-  save.dataset.state = state;
-  save.querySelector("span").textContent = state === "saving" ? "SAVING..." : state === "saved" ? "LOADOUT SAVED" : state === "error" && valid ? "RETRY SAVE" : "SAVE LOADOUT";
-  $("#restore-deck").classList.toggle("hidden", !dirty || deckSaving);
+  status.querySelector(".deck-status__emblem").textContent = state === "saved" ? "\u2713" : "!";
+  $("#builder-count").textContent = `${builderDeck.length} / ${DATA.deckSize}${valid ? " READY" : ""}`;
+  $("#deck-hint").classList.toggle("is-dismissed", deckHintDismissed);
+  $("#dismiss-deck-hint").classList.toggle("hidden", deckHintDismissed);
+  updateDeckSummary();
 }
 function renderDeckBuilder(options = {}) {
   ensureDeckCatalogue();
   updateDeckSlots(options.focus);
   updateWeaponOptions();
-  renderDeckDetails(builderDetailKey || builderDeck[0] || Object.keys(DATA.cards)[0], options.restoreDetailFocus);
+  updateDeckTabs();
+  updateLibraryState({ animate: options.animateLibrary });
   updateDeckStatus();
+  updateDeckUndo();
+}
+function clearDeckDragVisuals({ keepAvatar = false } = {}) {
+  $$("#builder-deck .deck-slot__select, #builder-deck .deck-slot__info").forEach(control => control.style.removeProperty("transform"));
+  $$("#builder-deck [data-deck-slot]").forEach(slot => slot.classList.remove("is-dragging", "is-drop-target", "is-shifting"));
+  if (!keepAvatar) document.querySelectorAll(".deck-drag-avatar").forEach(element => element.remove());
+}
+function clearDeckMotion() {
+  deckMotionSequence++;
+  deckReflowSequence++;
+  if (deckPointerDrag?.holdTimer) clearTimeout(deckPointerDrag.holdTimer);
+  if (deckPointerDrag?.capture.hasPointerCapture?.(deckPointerDrag.pointerId)) deckPointerDrag.capture.releasePointerCapture(deckPointerDrag.pointerId);
+  deckPointerDrag = null;
+  deckKeyboardDrag = null;
+  suppressDeckClick = false;
+  deckTravelClone?.remove();
+  deckTravelClone = null;
+  deckRemovalClone?.remove();
+  deckRemovalClone = null;
+  document.querySelectorAll(".deck-travel-clone, .deck-drag-avatar, .armory-filter-clone").forEach(element => element.remove());
+  $$("#builder-deck .deck-slot__select, #builder-deck .deck-slot__info").forEach(control => control.getAnimations().forEach(animation => animation.cancel()));
+  $$("#card-library [data-library-card]").forEach(entry => entry.getAnimations().forEach(animation => animation.cancel()));
+  clearDeckDragVisuals();
 }
 function restoreDeckScroll(scrollTop) {
   $("#deck-screen").scrollTop = scrollTop;
   requestAnimationFrame(() => { $("#deck-screen").scrollTop = scrollTop; });
 }
-function toggleDeckCard(key, options = {}) {
-  if (!ownsDefinition(DATA.cards, key)) return false;
+function clearDeckUndo() {
+  if (deckUndoTimer) clearTimeout(deckUndoTimer);
+  deckUndoTimer = null;
+  deckUndoState = null;
+  updateDeckUndo();
+}
+function setDeckUndo(snapshot, copy) {
+  if (deckUndoTimer) clearTimeout(deckUndoTimer);
+  deckUndoState = { deck: [...snapshot.deck], weapon: snapshot.weapon, copy };
+  updateDeckUndo();
+  const expire = () => {
+    if ($("#deck-undo").contains(document.activeElement)) {
+      deckUndoTimer = setTimeout(expire, 2000);
+      return;
+    }
+    deckUndoState = null;
+    deckUndoTimer = null;
+    updateDeckUndo();
+  };
+  deckUndoTimer = setTimeout(expire, 9000);
+}
+function captureTravelRect(element) {
+  if (!(element instanceof Element)) return null;
+  const rect = element.getBoundingClientRect();
+  return rect.width && rect.height ? { left: rect.left, top: rect.top, width: rect.width, height: rect.height } : null;
+}
+function captureDeckRects() {
+  return new Map($$("#builder-deck [data-deck-slot]").flatMap(slot => {
+    const key = slot.dataset.cardKey;
+    const rect = slot.querySelector(".deck-slot__select")?.getBoundingClientRect();
+    return key && rect?.width && rect?.height ? [[key, { left: rect.left, top: rect.top }]] : [];
+  }));
+}
+function animateDeckReflow(firstRects) {
+  if (!firstRects?.size || reducedDeckMotion()) return;
+  const sequence = ++deckReflowSequence;
+  requestAnimationFrame(() => {
+    if (sequence !== deckReflowSequence) return;
+    for (const [key, first] of firstRects) {
+      const slot = $(`#builder-deck [data-card-key="${key}"]`);
+      const main = slot?.querySelector(".deck-slot__select");
+      if (!main) continue;
+      const controls = slot.querySelectorAll(".deck-slot__select, .deck-slot__info");
+      controls.forEach(control => control.getAnimations().forEach(animation => animation.cancel()));
+      const last = main.getBoundingClientRect();
+      const x = Math.round(first.left - last.left);
+      const y = Math.round(first.top - last.top);
+      if (!x && !y) continue;
+      controls.forEach(control => control.animate([{ transform: `translate(${x}px, ${y}px)`, opacity: .72 }, { transform: "translate(0, 0)", opacity: 1 }], { duration: 210, easing: "cubic-bezier(.2,.8,.2,1)" }));
+    }
+  });
+}
+function pulseDeckSlot(index, className = "is-confirmed") {
+  const slot = $(`[data-deck-slot="${index}"]`);
+  if (!slot) return;
+  slot.classList.remove(className);
+  requestAnimationFrame(() => slot.classList.add(className));
+  setTimeout(() => slot.classList.remove(className), reducedDeckMotion() ? 40 : 360);
+}
+function animateDeckTravel(startRect, key, destinationIndex) {
+  pulseDeckSlot(destinationIndex);
+  if (!startRect || reducedDeckMotion()) return;
+  const destination = $(`[data-deck-slot="${destinationIndex}"] .deck-slot__select`)?.getBoundingClientRect();
+  if (!destination || startRect.top + startRect.height < 0 || startRect.top > innerHeight) return;
+  const destinationVisible = destination.bottom >= 0 && destination.top <= innerHeight;
+  deckTravelClone?.remove();
+  const clone = document.createElement("div");
+  clone.className = "deck-travel-clone";
+  clone.setAttribute("aria-hidden", "true");
+  clone.innerHTML = cardFrame(key, { variant: "deck" });
+  const width = Math.max(88, Math.min(150, destination.width));
+  clone.style.left = `${Math.round(startRect.left + startRect.width / 2 - width / 2)}px`;
+  clone.style.top = `${Math.round(startRect.top + startRect.height / 2 - destination.height / 2)}px`;
+  clone.style.width = `${Math.round(width)}px`;
+  clone.style.height = `${Math.round(destination.height)}px`;
+  document.body.append(clone);
+  deckTravelClone = clone;
+  const start = clone.getBoundingClientRect();
+  const x = destinationVisible ? Math.round(destination.left + destination.width / 2 - (start.left + start.width / 2)) : 0;
+  const y = destinationVisible ? Math.round(destination.top + destination.height / 2 - (start.top + start.height / 2)) : -8;
+  const animation = clone.animate([{ transform: "translate(0, 0)", opacity: .92 }, { transform: `translate(${x}px, ${y}px)`, opacity: .28 }], { duration: 220, easing: "cubic-bezier(.2,.8,.2,1)" });
+  animation.finished.catch(() => {}).finally(() => {
+    if (deckTravelClone === clone) deckTravelClone = null;
+    clone.remove();
+  });
+}
+function animateDeckRemoval(startRect, key) {
+  if (!startRect || reducedDeckMotion()) return;
+  const clone = document.createElement("div");
+  clone.className = "deck-travel-clone is-removing";
+  clone.setAttribute("aria-hidden", "true");
+  clone.innerHTML = cardFrame(key, { variant: "deck" });
+  Object.assign(clone.style, { left: `${Math.round(startRect.left)}px`, top: `${Math.round(startRect.top)}px`, width: `${Math.round(startRect.width)}px`, height: `${Math.round(startRect.height)}px` });
+  document.body.append(clone);
+  deckRemovalClone?.remove();
+  deckRemovalClone = clone;
+  const animation = clone.animate([{ transform: "translateY(0)", opacity: 1 }, { transform: "translateY(8px)", opacity: 0 }], { duration: 200, easing: "ease-out" });
+  animation.finished.catch(() => {}).finally(() => {
+    if (deckRemovalClone === clone) deckRemovalClone = null;
+    clone.remove();
+  });
+}
+function commitDeckMutation({ copy, announcement, focus = null, travel = null, removed = null, destination = null }, mutation) {
+  const before = { deck: [...builderDeck], weapon: builderWeapon };
+  const firstRects = captureDeckRects();
   const scrollTop = $("#deck-screen").scrollTop;
-  const index = builderDeck.indexOf(key);
-  if (index >= 0) {
-    builderDeck.splice(index, 1);
-    announceDeck(`${DATA.cards[key].name} removed. ${builderDeck.length} of ${DATA.deckSize} cards selected.`);
-  } else if (builderDeck.length < DATA.deckSize) {
-    builderDeck.push(key);
-    announceDeck(`${DATA.cards[key].name} added in position ${builderDeck.length}.`);
-  } else {
-    builderDetailKey = key;
-    renderDeckDetails(key, options.restoreDetailFocus);
-    announceDeck(`Deck full. Details for ${DATA.cards[key].name} remain available.`);
-    return false;
-  }
-  builderDetailKey = key;
-  persistDeckDraft();
-  renderDeckBuilder({ focus: options.focus, restoreDetailFocus: options.restoreDetailFocus });
+  mutation();
+  setDeckUndo(before, copy);
+  autoSaveBuilderDeck();
+  renderDeckBuilder({ focus });
   restoreDeckScroll(scrollTop);
+  animateDeckReflow(firstRects);
+  if (travel) animateDeckTravel(travel.rect, travel.key, destination);
+  if (removed) animateDeckRemoval(removed.rect, removed.key);
+  if (Number.isInteger(destination) && !travel) pulseDeckSlot(destination);
+  announceDeck(announcement);
+}
+function selectDeckSlot(index) {
+  if (!builderDeck[index]) return;
+  const same = activeDeckSlot === index;
+  activeDeckSlot = same ? -1 : index;
+  expandedArmoryKey = null;
+  renderDeckBuilder({ focus: { key: builderDeck[index], action: "select" } });
+  announceDeck(same ? `${DATA.cards[builderDeck[index]].name} actions closed.` : `${DATA.cards[builderDeck[index]].name} actions opened. Info is followed by Remove.`);
+}
+function selectEmptyDeckSlot(index) {
+  if (builderDeck[index] || builderDeck.length >= DATA.deckSize || index !== builderDeck.length) return;
+  activeDeckSlot = -1;
+  expandedArmoryKey = null;
+  updateDeckSlots();
+  updateLibraryState();
+  $("#armory-toolbar").scrollIntoView({ block: "start", behavior: reducedDeckMotion() ? "auto" : "smooth" });
+  announceDeck(`Choose a card from the Armory, then choose its exact draw position.`);
+}
+function cancelDeckSelection(announce = true, restoreFocus = false) {
+  if (activeDeckSlot < 0 && !expandedArmoryKey) return false;
+  const index = activeDeckSlot;
+  const deckKey = index >= 0 ? builderDeck[index] : null;
+  const armoryKey = expandedArmoryKey;
+  activeDeckSlot = -1;
+  expandedArmoryKey = null;
+  updateDeckSlots(restoreFocus && deckKey ? { key: deckKey, action: "select" } : null);
+  updateLibraryState();
+  if (restoreFocus && armoryKey) requestAnimationFrame(() => $(`[data-library-card="${armoryKey}"] [data-card-action="toggle"]`)?.focus({ preventScroll: true }));
+  if (announce) announceDeck("Card actions closed.");
   return true;
 }
-function saveDeckBuilder() {
-  if (!isValidDeck(builderDeck) || !ownsDefinition(DATA.weapons, builderWeapon)) return;
-  const candidate = { ...profile, deck: [...builderDeck], weapon: builderWeapon, deckDraft: null };
-  deckSaving = true;
-  deckStorageError = false;
-  updateDeckStatus();
-  if (!saveProfile(candidate)) {
-    deckSaving = false;
-    deckStorageError = true;
-    updateDeckStatus();
-    announceDeck("Loadout was not saved because browser storage is unavailable. Battles still use the previous saved loadout.");
-    toast("LOADOUT NOT SAVED - STORAGE UNAVAILABLE");
-    return;
-  }
-  profile = candidate;
-  renderProfile();
-  updateDeckStatus();
-  setTimeout(() => {
-    deckSaving = false;
-    renderDeckBuilder();
-    announceDeck("Loadout saved. Battles will use this exact order and weapon.");
-    toast("LOADOUT SAVED");
-  }, 120);
+function toggleArmoryCard(key) {
+  if (!ownsDefinition(DATA.cards, key)) return;
+  const same = expandedArmoryKey === key;
+  expandedArmoryKey = same ? null : key;
+  activeDeckSlot = -1;
+  updateDeckSlots();
+  updateLibraryState();
+  announceDeck(same ? `${DATA.cards[key].name} actions closed.` : `${DATA.cards[key].name} actions opened. Info is followed by ${builderDeck.includes(key) ? `In Deck number ${deckPosition(key) + 1}` : "Choose Position"}.`);
 }
-
-function restoreSavedDeck() {
-  const candidate = { ...profile, deckDraft: null };
-  if (!saveProfile(candidate)) {
-    deckStorageError = true;
-    updateDeckStatus();
-    announceDeck("Saved loadout could not be restored because browser storage is unavailable. The current in-memory draft remains open.");
-    toast("DRAFT NOT DISCARDED - STORAGE UNAVAILABLE");
-    return;
+function identifyDeckMember(key) {
+  const index = deckPosition(key);
+  if (index < 0) return;
+  const slot = $(`[data-deck-slot="${index}"]`);
+  slot.classList.remove("is-located");
+  requestAnimationFrame(() => slot.classList.add("is-located"));
+  setTimeout(() => slot.classList.remove("is-located"), 500);
+  announceDeck(`${DATA.cards[key].name} is already in draw position ${index + 1}.`);
+}
+function armoryChooseControl(origin, key) {
+  const entry = origin?.closest?.("[data-library-card]") || $(`[data-library-card="${key}"]`);
+  return entry?.querySelector('[data-card-action="toggle"]') || null;
+}
+function restoreArmoryFocus(control) {
+  if (control?.isConnected) requestAnimationFrame(() => control.focus({ preventScroll: true }));
+}
+function addDeckCard(key, origin, destination = builderDeck.length) {
+  if (!ownsDefinition(DATA.cards, key) || builderDeck.includes(key) || builderDeck.length >= DATA.deckSize || !Number.isInteger(destination) || destination < 0 || destination > builderDeck.length) return false;
+  const armoryFocus = armoryChooseControl(origin, key);
+  const travel = { rect: captureTravelRect(origin), key };
+  commitDeckMutation({ copy: `Added ${DATA.cards[key].name}.`, announcement: `${DATA.cards[key].name} added in draw position ${destination + 1}.`, focus: armoryFocus ? null : { key, action: "select" }, travel, destination }, () => {
+    builderDeck.splice(destination, 0, key);
+    activeDeckSlot = -1;
+    expandedArmoryKey = null;
+  });
+  if (activeDialog === $("#deck-replace-modal")) closeReplacementSheet({ restoreFocus: false });
+  restoreArmoryFocus(armoryFocus);
+  return true;
+}
+function replaceDeckCard(index, key, origin = null) {
+  if (!ownsDefinition(DATA.cards, key) || !builderDeck[index]) return false;
+  const existingPosition = deckPosition(key);
+  if (existingPosition >= 0) {
+    identifyDeckMember(key);
+    return false;
   }
-  profile = candidate;
-  builderDeck = [...profile.deck];
-  builderWeapon = profile.weapon;
-  builderDetailKey = builderDeck[0];
-  deckStorageError = false;
-  renderDeckBuilder();
-  announceDeck("Saved loadout restored. Unsaved draft discarded.");
+  const oldKey = builderDeck[index];
+  const armoryFocus = activeDialog === $("#deck-replace-modal") ? dialogReturnFocus : armoryChooseControl(origin, key);
+  const travel = { rect: captureTravelRect(origin), key };
+  const removedOrigin = origin?.closest?.("[data-replace-slot]") || $(`[data-deck-slot="${index}"] .deck-slot__select`);
+  const removed = { rect: captureTravelRect(removedOrigin), key: oldKey };
+  commitDeckMutation({ copy: `Replaced ${DATA.cards[oldKey].name} with ${DATA.cards[key].name}.`, announcement: `${DATA.cards[oldKey].name} replaced by ${DATA.cards[key].name} in draw position ${index + 1}.`, focus: armoryFocus ? null : { key, action: "select" }, travel, removed, destination: index }, () => {
+    builderDeck[index] = key;
+    activeDeckSlot = -1;
+    expandedArmoryKey = null;
+  });
+  if (activeDialog === $("#deck-replace-modal")) closeReplacementSheet({ restoreFocus: false });
+  restoreArmoryFocus(armoryFocus);
+  return true;
+}
+function removeSelectedDeckCard() {
+  const index = activeDeckSlot;
+  const key = builderDeck[index];
+  if (!key) return false;
+  const focusKey = builderDeck[index + 1] || builderDeck[index - 1] || null;
+  const focus = focusKey ? { key: focusKey, action: "select" } : { index: 0, action: "empty" };
+  const rect = captureTravelRect($(`[data-deck-slot="${index}"] .deck-slot__select`));
+  commitDeckMutation({ copy: `Removed ${DATA.cards[key].name}.`, announcement: `${DATA.cards[key].name} removed. ${DATA.deckSize - (builderDeck.length - 1)} ${DATA.deckSize - (builderDeck.length - 1) === 1 ? "card" : "cards"} now missing.`, focus, removed: { rect, key }, destination: Math.min(index, builderDeck.length - 2) }, () => {
+    builderDeck.splice(index, 1);
+    activeDeckSlot = -1;
+    expandedArmoryKey = null;
+  });
+  return true;
+}
+function reorderDeck(from, to, focus = true) {
+  if (from === to || from < 0 || to < 0 || from >= builderDeck.length || to >= builderDeck.length) return false;
+  const key = builderDeck[from];
+  commitDeckMutation({ copy: `Moved ${DATA.cards[key].name}.`, announcement: `${DATA.cards[key].name} moved from position ${from + 1} to position ${to + 1}.`, focus: focus ? { key, action: "select" } : null, destination: to }, () => {
+    const [moved] = builderDeck.splice(from, 1);
+    builderDeck.splice(to, 0, moved);
+    activeDeckSlot = -1;
+  });
+  return true;
+}
+function changeBuilderWeapon(key) {
+  if (!ownsDefinition(DATA.weapons, key) || key === builderWeapon) return false;
+  const previous = builderWeapon;
+  commitDeckMutation({ copy: `Changed weapon from ${DATA.weapons[previous].name} to ${DATA.weapons[key].name}.`, announcement: `${DATA.weapons[key].name} selected as the always-available weapon.` }, () => { builderWeapon = key; });
+  const root = $(`[data-weapon-root="${key}"]`);
+  root.classList.add("is-confirmed");
+  setTimeout(() => root.classList.remove("is-confirmed"), reducedDeckMotion() ? 40 : 360);
+  requestAnimationFrame(() => $(`[data-weapon="${key}"]`)?.focus({ preventScroll: true }));
+  return true;
+}
+function undoDeckEdit() {
+  if (!deckUndoState) return;
+  const undo = deckUndoState;
+  const firstRects = captureDeckRects();
+  const scrollTop = $("#deck-screen").scrollTop;
+  if (deckUndoTimer) clearTimeout(deckUndoTimer);
+  deckUndoTimer = null;
+  deckUndoState = null;
+  builderDeck = [...undo.deck];
+  builderWeapon = undo.weapon;
+  activeDeckSlot = -1;
+  replacementCandidate = null;
+  expandedArmoryKey = null;
+  autoSaveBuilderDeck();
+  renderDeckBuilder({ animateLibrary: true });
+  restoreDeckScroll(scrollTop);
+  animateDeckReflow(firstRects);
+  $("#builder-deck").classList.add("is-restored");
+  setTimeout(() => $("#builder-deck").classList.remove("is-restored"), reducedDeckMotion() ? 40 : 360);
+  announceDeck(`Undone. ${undo.copy}`);
   $("#deck-builder-title").focus({ preventScroll: true });
 }
-
+function openDeckInfo(source, key, origin) {
+  const registry = source === "weapon" ? DATA.weapons : DATA.cards;
+  const definition = registry[key];
+  if (!definition) return;
+  const categoryKey = source === "weapon" ? "attack" : definition.category;
+  const category = DATA.categories[categoryKey];
+  const stats = source === "weapon" ? DATA.weaponStats[key] : DATA.cardStats[key];
+  const art = $("#deck-info-art");
+  art.className = `pixel-sprite pixel-portrait-fallback pixel-${source}-${key}`;
+  $("#deck-info-short").textContent = definition.short;
+  $("#deck-info-category").innerHTML = `<span></span> ${escapeMarkup(category.name.toUpperCase())} INFORMATION`;
+  $("#deck-info-name").textContent = definition.name.toUpperCase();
+  $("#deck-info-meta").textContent = `${category.name.toUpperCase()} / ${(source === "weapon" ? "WEAPON" : definition.type).toUpperCase()}`;
+  $("#deck-info-cost").textContent = `${definition.cost} TAPS`;
+  $("#deck-info-description").textContent = definition.description;
+  $("#deck-info-stats").innerHTML = (stats || []).map(stat => `<b role="listitem">${escapeMarkup(stat)}</b>`).join("");
+  const position = source === "card" ? deckPosition(key) : -1;
+  $("#deck-info-membership").textContent = source === "weapon" ? (builderWeapon === key ? "Selected as your always-available weapon." : "Available as an alternate permanent weapon.") : position >= 0 ? `Currently in draw position ${position + 1}.` : "Not currently in your draw order.";
+  openLifecycleDialog($("#deck-info-modal"), $("#deck-info-name"), origin);
+}
+function closeDeckInfo() { closeLifecycleDialog($("#deck-info-modal")); }
+function openReplacementSheet(key, origin) {
+  if (!ownsDefinition(DATA.cards, key) || builderDeck.includes(key) || builderDeck.length > DATA.deckSize) return;
+  replacementCandidate = key;
+  $(`[data-library-card="${key}"]`)?.classList.add("is-replacement-candidate");
+  const full = builderDeck.length === DATA.deckSize;
+  $("#deck-replace-title").textContent = `CHOOSE A POSITION FOR ${DATA.cards[key].name.toUpperCase()}`;
+  $("#deck-replace-copy").textContent = full ? `Choose the draw position to replace with ${DATA.cards[key].name}. The complete deck auto-saves immediately.` : `Choose where to insert ${DATA.cards[key].name}. Existing cards keep their relative order.`;
+  const positions = full ? builderDeck.map((deckKey, index) => ({ index, deckKey, label: `REPLACE #${index + 1}` })) : Array.from({ length: builderDeck.length + 1 }, (_, index) => ({ index, deckKey: builderDeck[index] || null, label: `INSERT AS #${index + 1}` }));
+  $("#deck-replacement-options").innerHTML = positions.map(({ index, deckKey, label }) => `<article role="listitem"><button class="replacement-slot" type="button" data-replace-slot="${index}" data-card-key="${deckKey || ""}" aria-label="${full ? `Replace ${escapeMarkup(DATA.cards[deckKey].name)} at draw position ${index + 1}` : `Insert ${escapeMarkup(DATA.cards[key].name)} at draw position ${index + 1}`}"><span class="replacement-slot__position">${label}</span>${deckKey ? cardFrame(deckKey, { variant: "deck" }) : `<span class="replacement-slot__empty">END OF CYCLE</span>`}</button></article>`).join("");
+  openLifecycleDialog($("#deck-replace-modal"), $("#deck-replace-title"), origin);
+}
+function closeReplacementSheet(options = {}) {
+  if (replacementCandidate) $(`[data-library-card="${replacementCandidate}"]`)?.classList.remove("is-replacement-candidate");
+  replacementCandidate = null;
+  closeLifecycleDialog($("#deck-replace-modal"), options);
+}
+function chooseArmoryCard(key, origin) {
+  if (!ownsDefinition(DATA.cards, key)) return;
+  if (builderDeck.includes(key)) {
+    identifyDeckMember(key);
+    return;
+  }
+  openReplacementSheet(key, origin?.querySelector?.('[data-card-action="choose"]') || origin);
+}
+function placeArmoryCard(index, key, origin) {
+  if (!ownsDefinition(DATA.cards, key) || builderDeck.includes(key)) return false;
+  return builderDeck.length === DATA.deckSize ? replaceDeckCard(index, key, origin) : addDeckCard(key, origin, index);
+}
+function resetDeckBrowse() {
+  builderSearch = "";
+  builderFilter = "all";
+  builderSort = "recommended";
+  updateLibraryState({ animate: true });
+  announceDeck("Armory search, category, and sort reset.");
+}
+function dismissDeckHint() {
+  deckHintDismissed = true;
+  const candidate = { ...profile, deckHintDismissed: true };
+  if (saveProfile(candidate)) profile = candidate;
+  $("#deck-builder-title").focus({ preventScroll: true });
+  updateDeckStatus();
+  announceDeck("Deck guidance dismissed. The same instructions remain available to assistive technology.");
+}
+function applyDeckDragPreview(from, to) {
+  clearDeckDragVisuals({ keepAvatar: true });
+  const slots = $$("#builder-deck [data-deck-slot]");
+  const order = Array.from({ length: builderDeck.length }, (_, index) => index);
+  const [moved] = order.splice(from, 1);
+  order.splice(to, 0, moved);
+  order.forEach((oldIndex, newIndex) => {
+    const controls = slots[oldIndex]?.querySelectorAll(".deck-slot__select, .deck-slot__info");
+    if (!controls?.length || oldIndex === newIndex) return;
+    const start = slots[oldIndex].getBoundingClientRect();
+    const end = slots[newIndex].getBoundingClientRect();
+    controls.forEach(control => { control.style.transform = `translate(${Math.round(end.left - start.left)}px, ${Math.round(end.top - start.top)}px)`; });
+    slots[oldIndex].classList.add("is-shifting");
+  });
+  slots[from]?.classList.add("is-dragging");
+  slots[to]?.classList.add("is-drop-target");
+}
+function beginKeyboardDeckDrag(index) {
+  const key = builderDeck[index];
+  if (!key) return;
+  activeDeckSlot = -1;
+  expandedArmoryKey = null;
+  deckKeyboardDrag = { key, from: index, proposed: index };
+  updateDeckSlots();
+  updateLibraryState({ animate: true });
+  applyDeckDragPreview(index, index);
+  announceDeck(`${DATA.cards[key].name} picked up from position ${index + 1}. Use Arrow keys, Home, or End to choose a position; Space drops and Escape cancels.`);
+}
+function cancelKeyboardDeckDrag() {
+  if (!deckKeyboardDrag) return;
+  const { key, from } = deckKeyboardDrag;
+  deckKeyboardDrag = null;
+  suppressDeckClick = false;
+  clearDeckDragVisuals();
+  updateDeckSlots({ key, action: "select" });
+  announceDeck(`${DATA.cards[key].name} movement canceled. It remains in position ${from + 1}.`);
+}
+function handleDeckReorderKey(event) {
+  const control = event.target.closest('[data-slot-action="select"]');
+  if (!control || !event.currentTarget.contains(control)) return;
+  const index = Number(control.closest("[data-deck-slot]")?.dataset.deckSlot);
+  if (!Number.isInteger(index) || !builderDeck[index]) return;
+  if (!deckKeyboardDrag) {
+    if (event.key !== " " && event.key !== "Spacebar") return;
+    event.preventDefault();
+    event.stopPropagation();
+    suppressDeckClick = true;
+    beginKeyboardDeckDrag(index);
+    return;
+  }
+  if (deckKeyboardDrag.key !== control.dataset.cardKey) return;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    event.stopPropagation();
+    suppressDeckClick = true;
+    cancelKeyboardDeckDrag();
+    return;
+  }
+  if (event.key === " " || event.key === "Spacebar") {
+    event.preventDefault();
+    event.stopPropagation();
+    suppressDeckClick = true;
+    const drag = deckKeyboardDrag;
+    deckKeyboardDrag = null;
+    clearDeckDragVisuals();
+    if (!reorderDeck(drag.from, drag.proposed)) {
+      updateDeckSlots({ key: drag.key, action: "select" });
+      announceDeck(`${DATA.cards[drag.key].name} returned to position ${drag.from + 1}.`);
+    }
+    return;
+  }
+  let proposed = deckKeyboardDrag.proposed;
+  if (event.key === "ArrowLeft") proposed--;
+  else if (event.key === "ArrowRight") proposed++;
+  else if (event.key === "ArrowUp") proposed -= 3;
+  else if (event.key === "ArrowDown") proposed += 3;
+  else if (event.key === "Home") proposed = 0;
+  else if (event.key === "End") proposed = builderDeck.length - 1;
+  else return;
+  event.preventDefault();
+  event.stopPropagation();
+  proposed = clamp(proposed, 0, builderDeck.length - 1);
+  if (proposed === deckKeyboardDrag.proposed) return;
+  deckKeyboardDrag.proposed = proposed;
+  applyDeckDragPreview(deckKeyboardDrag.from, proposed);
+  announceDeck(`${DATA.cards[deckKeyboardDrag.key].name} proposed for position ${proposed + 1}.`);
+}
+function positionDeckDragAvatar(state, x, y) {
+  if (!state.avatar) return;
+  state.avatar.style.left = `${Math.round(x - state.avatar.offsetWidth / 2)}px`;
+  state.avatar.style.top = `${Math.round(y - 28)}px`;
+}
+function beginPointerDeckDrag(state) {
+  if (deckPointerDrag !== state || state.active) return;
+  if (state.holdTimer) clearTimeout(state.holdTimer);
+  state.holdTimer = null;
+  state.active = true;
+  if (activeDeckSlot >= 0 || expandedArmoryKey) {
+    activeDeckSlot = -1;
+    expandedArmoryKey = null;
+    updateDeckSlots();
+    updateLibraryState({ animate: true });
+  }
+  state.capture.setPointerCapture?.(state.pointerId);
+  const avatar = document.createElement("div");
+  avatar.className = "deck-drag-avatar";
+  avatar.setAttribute("aria-hidden", "true");
+  avatar.innerHTML = cardFrame(state.key, { variant: "deck" });
+  document.body.append(avatar);
+  state.avatar = avatar;
+  positionDeckDragAvatar(state, state.lastX, state.lastY);
+  applyDeckDragPreview(state.from, state.proposed);
+  suppressDeckClick = true;
+  announceDeck(`${DATA.cards[state.key].name} picked up from position ${state.from + 1}. Drag to another numbered position.`);
+}
+function handleDeckPointerDown(event) {
+  if (event.button !== 0 || !event.isPrimary || deckPointerDrag || deckKeyboardDrag) return;
+  const control = event.target.closest('.deck-slot__select');
+  if (!control || !event.currentTarget.contains(control)) return;
+  const slot = control.closest("[data-deck-slot]");
+  const index = Number(slot?.dataset.deckSlot);
+  const key = builderDeck[index];
+  if (!key) return;
+  const state = { pointerId: event.pointerId, pointerType: event.pointerType, from: index, proposed: index, validDrop: true, key, startX: event.clientX, startY: event.clientY, lastX: event.clientX, lastY: event.clientY, capture: event.currentTarget, active: false, holdTimer: null, avatar: null };
+  deckPointerDrag = state;
+  if (event.pointerType === "touch") state.holdTimer = setTimeout(() => beginPointerDeckDrag(state), 220);
+}
+function handleDeckPointerMove(event) {
+  const state = deckPointerDrag;
+  if (!state || state.pointerId !== event.pointerId) return;
+  state.lastX = event.clientX;
+  state.lastY = event.clientY;
+  const distance = Math.hypot(event.clientX - state.startX, event.clientY - state.startY);
+  if (!state.active && state.pointerType === "touch" && distance >= 8) {
+    if (state.holdTimer) clearTimeout(state.holdTimer);
+    deckPointerDrag = null;
+    return;
+  }
+  if (!state.active && state.pointerType !== "touch" && distance >= 6) beginPointerDeckDrag(state);
+  if (!state.active) return;
+  event.preventDefault();
+  positionDeckDragAvatar(state, event.clientX, event.clientY);
+  const target = document.elementFromPoint(event.clientX, event.clientY)?.closest("[data-deck-slot]");
+  const proposed = Number(target?.dataset.deckSlot);
+  state.validDrop = Number.isInteger(proposed) && proposed >= 0 && proposed < builderDeck.length;
+  if (state.validDrop && proposed !== state.proposed) {
+    state.proposed = proposed;
+    applyDeckDragPreview(state.from, proposed);
+    announceDeck(`${DATA.cards[state.key].name} over position ${proposed + 1}.`);
+  }
+  const screen = $("#deck-screen");
+  if (event.clientY < 76) screen.scrollTop = Math.max(0, screen.scrollTop - 12);
+  else if (event.clientY > innerHeight - 112) screen.scrollTop += 12;
+}
+function finishDeckPointerDrag(event, canceled = false) {
+  const state = deckPointerDrag;
+  if (!state || state.pointerId !== event.pointerId) return;
+  if (state.holdTimer) clearTimeout(state.holdTimer);
+  deckPointerDrag = null;
+  if (!state.active) return;
+  event.preventDefault();
+  if (state.capture.hasPointerCapture?.(state.pointerId)) state.capture.releasePointerCapture(state.pointerId);
+  state.avatar?.remove();
+  clearDeckDragVisuals();
+  suppressDeckClick = true;
+  setTimeout(() => { suppressDeckClick = false; }, 0);
+  if (canceled || !state.validDrop || state.from === state.proposed) {
+    updateDeckSlots({ key: state.key, action: "select" });
+    announceDeck(canceled || !state.validDrop ? `${DATA.cards[state.key].name} movement canceled. It remains in position ${state.from + 1}.` : `${DATA.cards[state.key].name} returned to position ${state.from + 1}.`);
+  } else reorderDeck(state.from, state.proposed);
+}
+function cancelPointerDeckDrag() {
+  const state = deckPointerDrag;
+  if (!state) return false;
+  if (state.holdTimer) clearTimeout(state.holdTimer);
+  deckPointerDrag = null;
+  suppressDeckClick = true;
+  if (!state.active) return true;
+  if (state.capture.hasPointerCapture?.(state.pointerId)) state.capture.releasePointerCapture(state.pointerId);
+  state.avatar?.remove();
+  clearDeckDragVisuals();
+  updateDeckSlots({ key: state.key, action: "select" });
+  announceDeck(`${DATA.cards[state.key].name} movement canceled. It remains in position ${state.from + 1}.`);
+  return true;
+}
+function finishGlobalDeckPointer(event, canceled = false) {
+  const hadDrag = Boolean(deckPointerDrag);
+  finishDeckPointerDrag(event, canceled);
+  if (!hadDrag && suppressDeckClick) setTimeout(() => { suppressDeckClick = false; }, 0);
+}
 function laneOccupant(player, category) {
   if (!player || !category) return null;
   if (category === "attack" && (player.weaponProgress > 0 || player.pending.some(job => job.source === "weapon"))) return { source: "weapon", key: player.weapon };
@@ -1458,6 +2205,8 @@ function handleDialogKeydown(event) {
   if (event.key === "Escape") {
     event.preventDefault();
     if (activeDialog === $("#leave-modal")) cancelLeaveBattle();
+    else if (activeDialog === $("#deck-info-modal")) closeDeckInfo();
+    else if (activeDialog === $("#deck-replace-modal")) closeReplacementSheet();
     else if (!rematchPending) returnToLobbyFromResult();
     return true;
   }
@@ -1484,68 +2233,116 @@ $("#online-button").addEventListener("click", toggleOnlineQueue);
 $("#battle-tab").addEventListener("click", showLobby);
 $("#open-deck").addEventListener("click", openDeckBuilder);
 $("#edit-deck").addEventListener("click", openDeckBuilder);
-$("#save-deck").addEventListener("click", saveDeckBuilder);
-$("#restore-deck").addEventListener("click", restoreSavedDeck);
+$("#undo-deck-edit").addEventListener("click", undoDeckEdit);
+$("#dismiss-deck-hint").addEventListener("click", dismissDeckHint);
+$("#deck-tabs").addEventListener("click", event => {
+  const tab = event.target.closest("[data-deck-tab]");
+  if (tab) switchBuilderDeck(Number(tab.dataset.deckTab));
+});
+$("#deck-tabs").addEventListener("keydown", event => {
+  const tab = event.target.closest("[data-deck-tab]");
+  if (!tab || !["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+  event.preventDefault();
+  const current = Number(tab.dataset.deckTab);
+  const next = event.key === "Home" ? 0 : event.key === "End" ? MAX_SAVED_DECKS - 1 : (current + (event.key === "ArrowLeft" ? -1 : 1) + MAX_SAVED_DECKS) % MAX_SAVED_DECKS;
+  switchBuilderDeck(next);
+});
 $("#weapon-options").addEventListener("click", event => {
+  const action = event.target.closest("[data-weapon-action]");
+  const root = event.target.closest("[data-weapon-root]");
+  if (!action || !root || !event.currentTarget.contains(root)) return;
+  const key = root.dataset.weaponRoot;
+  if (action.dataset.weaponAction === "info") openDeckInfo("weapon", key, action);
+  else if (action.dataset.weaponAction === "select") changeBuilderWeapon(key);
+});
+$("#weapon-options").addEventListener("keydown", event => {
   const button = event.target.closest("[data-weapon]");
-  if (!button || !ownsDefinition(DATA.weapons, button.dataset.weapon)) return;
-  builderWeapon = button.dataset.weapon;
-  persistDeckDraft();
-  renderDeckBuilder();
-  announceDeck(`${DATA.weapons[builderWeapon].name} selected as permanent weapon.`);
+  if (!button || !["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+  event.preventDefault();
+  const choices = $$("#weapon-options [data-weapon]");
+  const current = choices.indexOf(button);
+  const next = event.key === "Home" ? 0 : event.key === "End" ? choices.length - 1 : (current + (event.key === "ArrowLeft" || event.key === "ArrowUp" ? -1 : 1) + choices.length) % choices.length;
+  const nextChoice = choices[next];
+  changeBuilderWeapon(nextChoice.dataset.weapon);
+  nextChoice.focus({ preventScroll: true });
 });
 $("#deck-filters").addEventListener("click", event => {
   const button = event.target.closest("[data-deck-filter]");
   if (!button || (button.dataset.deckFilter !== "all" && !ownsDefinition(DATA.categories, button.dataset.deckFilter))) return;
   builderFilter = button.dataset.deckFilter;
-  updateLibraryState();
+  updateLibraryState({ animate: true });
   announceDeck(`${button.textContent.toLowerCase()} cards shown.`);
+});
+$("#deck-search").addEventListener("input", event => {
+  builderSearch = event.currentTarget.value;
+  updateLibraryState({ animate: true });
+  announceDeck(builderSearch ? `${$("#library-count").textContent.toLowerCase()} shown for search ${builderSearch}.` : "Armory search cleared.");
+});
+$("#deck-sort").addEventListener("change", event => {
+  builderSort = event.currentTarget.value;
+  updateLibraryState({ animate: true });
+  announceDeck(`Armory sorted by ${event.currentTarget.selectedOptions[0].textContent.toLowerCase()}.`);
+});
+$("#clear-deck-search").addEventListener("click", () => {
+  builderSearch = "";
+  updateLibraryState({ animate: true });
+  $("#deck-search").focus({ preventScroll: true });
+  announceDeck("Armory search cleared.");
+});
+$("#reset-deck-filters").addEventListener("click", resetDeckBrowse);
+$("#clear-empty-armory").addEventListener("click", () => {
+  resetDeckBrowse();
+  $("#deck-search").focus({ preventScroll: true });
 });
 $("#card-library").addEventListener("click", event => {
   const action = event.target.closest("[data-card-action]");
   const entry = event.target.closest("[data-library-card]");
   if (!action || !entry || !event.currentTarget.contains(entry)) return;
   const key = entry.dataset.libraryCard;
-  if (action.dataset.cardAction === "details") {
-    renderDeckDetails(key);
-    announceDeck(`Details for ${DATA.cards[key].name}.`);
-  } else if (action.dataset.cardAction === "toggle") toggleDeckCard(key);
+  if (action.dataset.cardAction === "toggle") toggleArmoryCard(key);
+  else if (action.dataset.cardAction === "info") openDeckInfo("card", key, action);
+  else if (action.dataset.cardAction === "choose") chooseArmoryCard(key, entry);
+  else if (action.dataset.cardAction === "locate") identifyDeckMember(key);
 });
 $("#builder-deck").addEventListener("click", event => {
+  if (suppressDeckClick) return;
   const button = event.target.closest("[data-slot-action]");
   if (!button || !event.currentTarget.contains(button)) return;
-  const key = button.dataset.cardKey;
-  const index = builderDeck.indexOf(key);
-  if (index < 0) return;
+  const slot = button.closest("[data-deck-slot]");
+  const index = Number(slot?.dataset.deckSlot);
+  const key = builderDeck[index];
   const action = button.dataset.slotAction;
-  if (action === "details") {
-    renderDeckDetails(key);
-    announceDeck(`Details for ${DATA.cards[key].name}, position ${index + 1}.`);
-    return;
-  }
-  if (action === "remove") {
-    const scrollTop = $("#deck-screen").scrollTop;
-    builderDeck.splice(index, 1);
-    builderDetailKey = key;
-    persistDeckDraft();
-    renderDeckBuilder({ restoreDetailFocus: true });
-    restoreDeckScroll(scrollTop);
-    announceDeck(`${DATA.cards[key].name} removed. ${builderDeck.length} of ${DATA.deckSize} cards selected.`);
-    return;
-  }
-  const targetIndex = action === "left" ? index - 1 : action === "right" ? index + 1 : -1;
-  if (targetIndex < 0 || targetIndex >= builderDeck.length) return;
-  const scrollTop = $("#deck-screen").scrollTop;
-  [builderDeck[index], builderDeck[targetIndex]] = [builderDeck[targetIndex], builderDeck[index]];
-  persistDeckDraft();
-  renderDeckBuilder({ focus: { key, action } });
-  restoreDeckScroll(scrollTop);
-  announceDeck(`${DATA.cards[key].name} moved to position ${targetIndex + 1}.`);
+  if (action === "select") selectDeckSlot(index);
+  else if (action === "empty") selectEmptyDeckSlot(index);
+  else if (action === "info" && key) openDeckInfo("card", key, button);
+  else if (action === "remove" && index === activeDeckSlot) removeSelectedDeckCard();
 });
-$("#deck-detail-toggle").addEventListener("click", event => {
-  const key = event.currentTarget.dataset.cardKey;
-  if (key) toggleDeckCard(key, { restoreDetailFocus: true });
+$("#builder-deck").addEventListener("keydown", handleDeckReorderKey);
+$("#builder-deck").addEventListener("keyup", event => { if (event.key === " " || event.key === "Spacebar") setTimeout(() => { suppressDeckClick = false; }, 0); });
+$("#builder-deck").addEventListener("pointerdown", handleDeckPointerDown);
+$("#builder-deck").addEventListener("pointermove", handleDeckPointerMove);
+$("#builder-deck").addEventListener("touchmove", event => {
+  if (deckPointerDrag?.active && deckPointerDrag.pointerType === "touch") event.preventDefault();
+}, { passive: false });
+$("#builder-deck").addEventListener("pointerup", event => finishGlobalDeckPointer(event));
+$("#builder-deck").addEventListener("pointercancel", event => finishGlobalDeckPointer(event, true));
+document.addEventListener("pointerup", event => finishGlobalDeckPointer(event));
+document.addEventListener("pointercancel", event => finishGlobalDeckPointer(event, true));
+$("#close-deck-info").addEventListener("click", closeDeckInfo);
+$("#deck-info-modal").addEventListener("pointerdown", event => { if (event.target === event.currentTarget) closeDeckInfo(); });
+$("#cancel-replacement-sheet").addEventListener("click", () => closeReplacementSheet());
+$("#deck-replace-modal").addEventListener("pointerdown", event => { if (event.target === event.currentTarget) closeReplacementSheet(); });
+$("#deck-replacement-options").addEventListener("click", event => {
+  const button = event.target.closest("[data-replace-slot]");
+  if (!button || !replacementCandidate) return;
+  placeArmoryCard(Number(button.dataset.replaceSlot), replacementCandidate, button);
 });
+$("#deck-screen").addEventListener("scroll", event => {
+  const screen = event.currentTarget;
+  screen.classList.toggle("is-scrolled", screen.scrollTop > 8);
+  const toolbar = $("#armory-toolbar");
+  screen.classList.toggle("is-browsing-armory", toolbar.getBoundingClientRect().top <= screen.getBoundingClientRect().top + 112);
+}, { passive: true });
 $("#battle-hand").addEventListener("pointerdown", placeHandCard);
 $("#battle-hand").addEventListener("contextmenu", event => {
   const button = event.target.closest("[data-hand-slot]");
@@ -1585,7 +2382,25 @@ for (const category of ["attack", "crew", "magic"]) {
   });
 }
 document.addEventListener("pointerdown", event => { if (event.button === 0) hideCardInspector(); }, true);
-document.addEventListener("keydown", event => { if (!handleDialogKeydown(event) && event.key === "Escape") hideCardInspector(); });
+document.addEventListener("click", event => {
+  if ((activeDeckSlot < 0 && !expandedArmoryKey) || $("#deck-screen").classList.contains("hidden")) return;
+  if (event.target.closest("#builder-deck [data-deck-slot], #card-library [data-library-card], .deck-overlay")) return;
+  cancelDeckSelection();
+});
+document.addEventListener("keydown", event => {
+  if (handleDialogKeydown(event) || event.key !== "Escape") return;
+  if (deckKeyboardDrag) {
+    event.preventDefault();
+    cancelKeyboardDeckDrag();
+  } else if (cancelPointerDeckDrag()) event.preventDefault();
+  else {
+    const selectionFocusWillHide = Boolean(document.activeElement?.closest?.(".card-action-popover"));
+    if (cancelDeckSelection(true, selectionFocusWillHide)) {
+      event.preventDefault();
+    }
+    else hideCardInspector();
+  }
+});
 $("#leave-battle").addEventListener("click", requestLeaveBattle);
 $("#cancel-leave").addEventListener("click", cancelLeaveBattle);
 $("#confirm-leave").addEventListener("click", confirmLeaveBattle);
@@ -1618,7 +2433,7 @@ socket.on("matchFound", ({ side, state }) => {
   showGame();
   render(state);
   announceLifecycle(`${state.mode === "cpu" ? "CPU battle" : "Online battle"} started.`);
-  if (preservedDraft) toast("MATCH FOUND - DECK DRAFT KEPT", "positive");
+  if (preservedDraft) toast("MATCH FOUND - DECK EDIT KEPT; LAST COMPLETE LOADOUT USED", "positive");
 });
 socket.on("state", state => { if (gameActive) render(state); });
 socket.on("gameOver", payload => endGame(payload));
